@@ -9,6 +9,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/Spinner";
 import { Button } from "../../components/ui/Button";
+import { Modal } from "../../components/ui/Modal";
 import { EyeIcon, DollarIcon, ClockIcon, UsersIcon } from "../../components/Icons";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
@@ -90,6 +91,7 @@ function TransactionsTab() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [details, setDetails] = useState<Transaction | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -161,6 +163,7 @@ function TransactionsTab() {
                       <td className="px-5 py-3 text-right">
                         <button
                           type="button"
+                          onClick={() => setDetails(t)}
                           className="inline-flex items-center gap-1.5 text-emerald-600 hover:underline text-sm font-medium"
                         >
                           <EyeIcon size={16} /> Review Details
@@ -185,6 +188,85 @@ function TransactionsTab() {
             setPage(1);
           }}
         />
+      </div>
+
+      <Modal
+        open={!!details}
+        onClose={() => setDetails(null)}
+        title="Transaction details"
+        size="md"
+      >
+        {details && (
+          <div className="space-y-3 text-sm">
+            <DetailRow label="Transaction ID" value={`TXN-${details._id.slice(-4).toUpperCase()}`} mono />
+            <DetailRow label="Full ID" value={details._id} mono />
+            <DetailRow label="Type" value={details.type.replace(/_/g, " ")} capitalize />
+            <DetailRow label="Status" value={details.status} capitalize />
+            {details.withdrawalStatus && (
+              <DetailRow label="Withdrawal status" value={details.withdrawalStatus} capitalize />
+            )}
+            <DetailRow
+              label="Amount"
+              value={
+                (details.amount < 0 ? "-" : "+") +
+                formatCurrency(Math.abs(details.amount))
+              }
+              tone={details.amount < 0 ? "danger" : "success"}
+            />
+            <DetailRow label="Date" value={formatDate(details.createdAt, true)} />
+            {details.user && (
+              <DetailRow
+                label="User"
+                value={`${details.user.name} (${details.user.email})`}
+              />
+            )}
+            {details.advisor && (
+              <DetailRow
+                label="Advisor"
+                value={`${details.advisor.name} (${details.advisor.email})`}
+              />
+            )}
+            {details.description && (
+              <DetailRow label="Description" value={details.description} />
+            )}
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+  capitalize = false,
+  tone,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  capitalize?: boolean;
+  tone?: "success" | "danger";
+}) {
+  const toneCls =
+    tone === "success"
+      ? "text-emerald-600 font-semibold"
+      : tone === "danger"
+        ? "text-red-600 font-semibold"
+        : "text-slate-800";
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-40 shrink-0 text-xs text-slate-500 pt-0.5">{label}</div>
+      <div
+        className={[
+          "flex-1 break-all",
+          toneCls,
+          mono ? "font-mono text-xs" : "",
+          capitalize ? "capitalize" : "",
+        ].join(" ")}
+      >
+        {value}
       </div>
     </div>
   );

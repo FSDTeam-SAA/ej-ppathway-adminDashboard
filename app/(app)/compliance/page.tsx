@@ -15,7 +15,12 @@ import { EyeIcon, ShieldIcon, PdfIcon, UploadIcon } from "../../components/Icons
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate } from "../../lib/format";
-import type { Complaint } from "../../lib/types";
+import type {
+  Complaint,
+  Dispute,
+  DisputeResolution,
+  DisputeStatus,
+} from "../../lib/types";
 import { MiniArea } from "../../components/charts";
 
 const TABS = [
@@ -31,6 +36,50 @@ type ListMeta = {
 };
 
 export default function CompliancePage() {
+  const [section, setSection] = useState<"complaints" | "disputes">("complaints");
+
+  return (
+    <>
+      <Topbar />
+      <main className="px-6 md:px-8 pb-10">
+        <PageHeader
+          title="Compliance & Safety"
+          breadcrumb={[
+            { label: "Dashboard", href: "/" },
+            { label: "Compliance & Safety" },
+          ]}
+        />
+        <div className="inline-flex bg-slate-100 rounded-xl p-1 mb-6">
+          <button
+            type="button"
+            onClick={() => setSection("complaints")}
+            className={`px-4 h-9 rounded-lg text-sm font-medium ${
+              section === "complaints"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Complaints
+          </button>
+          <button
+            type="button"
+            onClick={() => setSection("disputes")}
+            className={`px-4 h-9 rounded-lg text-sm font-medium ${
+              section === "disputes"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Disputes
+          </button>
+        </div>
+        {section === "complaints" ? <ComplaintsSection /> : <DisputesSection />}
+      </main>
+    </>
+  );
+}
+
+function ComplaintsSection() {
   const toast = useToast();
   const [tab, setTab] = useState("all");
   const [items, setItems] = useState<Complaint[]>([]);
@@ -88,17 +137,7 @@ export default function CompliancePage() {
   };
 
   return (
-    <>
-      <Topbar />
-      <main className="px-6 md:px-8 pb-10">
-        <PageHeader
-          title="Compliance & Safety"
-          breadcrumb={[
-            { label: "Dashboard", href: "/" },
-            { label: "Compliance & Safety" },
-          ]}
-        />
-
+    <div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <SummaryCard label="Total complain" value={totals.all} color="#86efac" icon={<ShieldIcon />} />
           <SummaryCard label="Total Solved Complain" value={totals.solved} color="#60a5fa" icon={<ShieldIcon />} />
@@ -272,9 +311,513 @@ export default function CompliancePage() {
             </div>
           )}
         </Modal>
-      </main>
-    </>
+    </div>
   );
+}
+
+const DISPUTE_TABS: { value: DisputeStatus | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "open", label: "Open" },
+  { value: "investigating", label: "Investigating" },
+  { value: "resolved", label: "Resolved" },
+  { value: "rejected", label: "Rejected" },
+];
+
+const RESOLUTION_OPTIONS: { value: DisputeResolution; label: string }[] = [
+  { value: "full_refund", label: "Full refund" },
+  { value: "partial_refund", label: "Partial refund" },
+  { value: "free_reschedule", label: "Free reschedule" },
+  { value: "assign_another_advisor", label: "Assign another advisor" },
+  { value: "no_action", label: "No action" },
+];
+
+function DisputesSection() {
+  const toast = useToast();
+  const [tab, setTab] = useState<DisputeStatus | "all">("all");
+  const [items, setItems] = useState<Dispute[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [details, setDetails] = useState<Dispute | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [resolution, setResolution] = useState<DisputeResolution>("full_refund");
+  const [refundAmount, setRefundAmount] = useState("");
+  const [reassignAdvisorId, setReassignAdvisorId] = useState("");
+  const [freeRescheduleAt, setFreeRescheduleAt] = useState("");
+  const [note, setNote] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get<Dispute[]>("/admin/disputes", {
+        page,
+        limit,
+        status: tab === "all" ? undefined : tab,
+      });
+      setItems(r.data || []);
+      setTotal(r.meta?.total || 0);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, page, limit]);
+
+  const closeAll = () => {
+    setDetails(null);
+    setResolveOpen(false);
+    setRejectOpen(false);
+    setRefundAmount("");
+    setReassignAdvisorId("");
+    setFreeRescheduleAt("");
+    setNote("");
+    setResolution("full_refund");
+  };
+
+  const markInvestigating = async () => {
+    if (!details) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/admin/disputes/${details._id}/investigating`);
+      toast.success("Marked as investigating");
+      closeAll();
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const submitResolve = async () => {
+    if (!details) return;
+    const body: Record<string, unknown> = { resolution, note };
+    if (resolution === "partial_refund") {
+      const v = Number(refundAmount);
+      if (!v || v <= 0) {
+        toast.error("Enter a valid refund amount");
+        return;
+      }
+      body.refundAmount = v;
+    }
+    if (resolution === "free_reschedule") {
+      if (!freeRescheduleAt) {
+        toast.error("Pick a reschedule date/time");
+        return;
+      }
+      body.freeRescheduleAt = freeRescheduleAt;
+    }
+    if (resolution === "assign_another_advisor") {
+      if (!reassignAdvisorId.trim()) {
+        toast.error("Enter the new advisor ID");
+        return;
+      }
+      body.reassignAdvisorId = reassignAdvisorId.trim();
+    }
+    setActionLoading(true);
+    try {
+      await api.post(`/admin/disputes/${details._id}/resolve`, body);
+      toast.success("Dispute resolved");
+      closeAll();
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const submitReject = async () => {
+    if (!details) return;
+    setActionLoading(true);
+    try {
+      await api.post(`/admin/disputes/${details._id}/reject`, { note });
+      toast.success("Dispute rejected");
+      closeAll();
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const totals = {
+    all: items.length,
+    open: items.filter((d) => d.status === "open").length,
+    investigating: items.filter((d) => d.status === "investigating").length,
+    resolved: items.filter((d) => d.status === "resolved").length,
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <SummaryCard label="Total disputes" value={total} color="#86efac" icon={<ShieldIcon />} />
+        <SummaryCard label="Investigating" value={totals.investigating} color="#fbbf24" icon={<ShieldIcon />} />
+        <SummaryCard label="Resolved" value={totals.resolved} color="#60a5fa" icon={<ShieldIcon />} />
+      </div>
+
+      <div className="mb-6">
+        <Tabs
+          tabs={DISPUTE_TABS.map((t) => ({ value: t.value, label: t.label }))}
+          active={tab}
+          onChange={(v) => {
+            setTab(v as DisputeStatus | "all");
+            setPage(1);
+          }}
+        />
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="py-20 flex justify-center text-[#0a7a90]">
+            <Spinner size={32} />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500">
+                <tr className="border-b border-slate-100">
+                  <th className="px-5 py-4 font-medium">User</th>
+                  <th className="px-5 py-4 font-medium">Advisor</th>
+                  <th className="px-5 py-4 font-medium">Type</th>
+                  <th className="px-5 py-4 font-medium">Session</th>
+                  <th className="px-5 py-4 font-medium">Opened</th>
+                  <th className="px-5 py-4 font-medium">Status</th>
+                  <th className="px-5 py-4 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-slate-500">
+                      No disputes
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((d) => (
+                    <tr key={d._id} className="border-b border-slate-50 last:border-0">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={d.user?.profilePhoto}
+                            name={d.user?.name}
+                            size={32}
+                          />
+                          <span className="font-medium text-slate-900">
+                            {d.user?.name || "—"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-slate-700">
+                        {d.advisor?.name || "—"}
+                      </td>
+                      <td className="px-5 py-3 text-slate-700 capitalize">
+                        {d.disputeType?.replace(/_/g, " ") || "—"}
+                      </td>
+                      <td className="px-5 py-3 text-slate-700">
+                        {d.session?.sessionCode || "—"}
+                      </td>
+                      <td className="px-5 py-3 text-slate-600">
+                        {formatDate(d.createdAt)}
+                      </td>
+                      <td className="px-5 py-3">
+                        <DisputeStatusBadge status={d.status} />
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDetails(d)}
+                          className="inline-flex items-center gap-1.5 text-[#0a7a90] hover:underline text-sm font-medium"
+                        >
+                          <EyeIcon size={16} />
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="px-5 py-3">
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPage={setPage}
+            onLimit={(l) => {
+              setLimit(l);
+              setPage(1);
+            }}
+          />
+        </div>
+      </div>
+
+      <Modal
+        open={!!details && !resolveOpen && !rejectOpen}
+        onClose={closeAll}
+        title="Dispute details"
+        size="md"
+      >
+        {details && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <Avatar
+                src={details.user?.profilePhoto}
+                name={details.user?.name}
+                size={48}
+              />
+              <div>
+                <div className="font-semibold text-slate-900">
+                  {details.user?.name}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {details.user?.email}
+                </div>
+              </div>
+              <div className="ml-auto">
+                <DisputeStatusBadge status={details.status} />
+              </div>
+            </div>
+            <Field
+              label="Type"
+              value={(details.disputeType || "—").replace(/_/g, " ")}
+            />
+            <Field
+              label="Expected resolution"
+              value={(details.expectedResolution || "—").replace(/_/g, " ")}
+            />
+            <Field label="Details" value={details.details || "—"} />
+            <Field label="Advisor" value={details.advisor?.name || "—"} />
+            <Field
+              label="Session"
+              value={
+                details.session?.sessionCode
+                  ? `${details.session.sessionCode} · ${formatCurrency(
+                      details.session.chargedAmount
+                    )}`
+                  : "—"
+              }
+            />
+            {details.refundAmount ? (
+              <Field
+                label="Refund issued"
+                value={formatCurrency(details.refundAmount)}
+              />
+            ) : null}
+            {details.resolutionNote ? (
+              <Field label="Resolution note" value={details.resolutionNote} />
+            ) : null}
+
+            {details.documents && details.documents.length > 0 && (
+              <div className="mt-3">
+                <div className="text-xs text-slate-500 mb-2">Documents</div>
+                <div className="border-2 border-dashed border-sky-300 rounded-xl p-3 space-y-2">
+                  {details.documents.map((url, i) => (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="bg-[#e6f2f6]/60 rounded-lg px-3 py-3 flex items-center justify-between hover:bg-[#e6f2f6]"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <PdfIcon className="text-rose-500" size={20} />
+                        <span className="text-sm text-slate-700 truncate max-w-xs">
+                          {url.split("/").pop() || `Document ${i + 1}`}
+                        </span>
+                      </span>
+                      <UploadIcon size={16} className="text-slate-500" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(details.status === "open" || details.status === "investigating") && (
+              <div className="grid grid-cols-2 gap-3 mt-5">
+                {details.status === "open" && (
+                  <Button
+                    variant="outline"
+                    loading={actionLoading}
+                    onClick={markInvestigating}
+                  >
+                    Mark Investigating
+                  </Button>
+                )}
+                <Button
+                  variant="danger"
+                  onClick={() => setRejectOpen(true)}
+                  className={details.status === "open" ? "" : "col-span-1"}
+                >
+                  Reject
+                </Button>
+                <Button
+                  variant="success"
+                  onClick={() => setResolveOpen(true)}
+                  className={
+                    details.status === "open" ? "col-span-2" : "col-span-1"
+                  }
+                >
+                  Resolve
+                </Button>
+              </div>
+            )}
+            {(details.status === "resolved" ||
+              details.status === "rejected" ||
+              details.status === "cancelled") && (
+              <div className="mt-5">
+                <Button variant="outline" onClick={closeAll}>
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={resolveOpen}
+        onClose={() => setResolveOpen(false)}
+        title="Resolve dispute"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">
+              Resolution
+            </label>
+            <select
+              value={resolution}
+              onChange={(e) =>
+                setResolution(e.target.value as DisputeResolution)
+              }
+              className="w-full h-11 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#0a7a90] focus:ring-2 focus:ring-[#0a7a90]/20 focus:outline-none"
+            >
+              {RESOLUTION_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {resolution === "partial_refund" && (
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                Refund amount (USD)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                className="w-full h-11 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#0a7a90] focus:ring-2 focus:ring-[#0a7a90]/20 focus:outline-none"
+                placeholder="e.g. 12.50"
+              />
+            </div>
+          )}
+
+          {resolution === "free_reschedule" && (
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                Reschedule date/time
+              </label>
+              <input
+                type="datetime-local"
+                value={freeRescheduleAt}
+                onChange={(e) => setFreeRescheduleAt(e.target.value)}
+                className="w-full h-11 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#0a7a90] focus:ring-2 focus:ring-[#0a7a90]/20 focus:outline-none"
+              />
+            </div>
+          )}
+
+          {resolution === "assign_another_advisor" && (
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                New advisor ID
+              </label>
+              <input
+                type="text"
+                value={reassignAdvisorId}
+                onChange={(e) => setReassignAdvisorId(e.target.value)}
+                className="w-full h-11 rounded-lg border border-slate-200 px-3 text-sm focus:border-[#0a7a90] focus:ring-2 focus:ring-[#0a7a90]/20 focus:outline-none"
+                placeholder="Mongo ObjectId"
+              />
+            </div>
+          )}
+
+          <Textarea
+            label="Note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Resolution explanation (optional)..."
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={() => setResolveOpen(false)}>
+              Back
+            </Button>
+            <Button
+              variant="success"
+              loading={actionLoading}
+              onClick={submitResolve}
+            >
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        title="Reject dispute"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <Textarea
+            label="Reason"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Why is the dispute being rejected?"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>
+              Back
+            </Button>
+            <Button
+              variant="danger"
+              loading={actionLoading}
+              onClick={submitReject}
+            >
+              Reject
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function DisputeStatusBadge({ status }: { status: DisputeStatus }) {
+  if (status === "open") return <Badge tone="warning">Open</Badge>;
+  if (status === "investigating") return <Badge tone="info">Investigating</Badge>;
+  if (status === "resolved") return <Badge tone="success">Resolved</Badge>;
+  if (status === "rejected") return <Badge tone="danger">Rejected</Badge>;
+  if (status === "cancelled") return <Badge>Cancelled</Badge>;
+  return <Badge>{status}</Badge>;
 }
 
 function PlanCell({ status }: { status?: string }) {

@@ -167,6 +167,37 @@ export interface Complaint {
   createdAt: string;
 }
 
+export type DisputeStatus =
+  | "open"
+  | "investigating"
+  | "resolved"
+  | "rejected"
+  | "cancelled";
+
+export type DisputeResolution =
+  | "full_refund"
+  | "partial_refund"
+  | "free_reschedule"
+  | "assign_another_advisor"
+  | "no_action";
+
+export interface Dispute {
+  _id: string;
+  user?: AdminUser;
+  advisor?: AdminUser;
+  session?: { _id: string; sessionCode?: string; type?: string; chargedAmount?: number };
+  disputeType: string;
+  details?: string;
+  expectedResolution: DisputeResolution;
+  documents?: string[];
+  status: DisputeStatus;
+  refundAmount?: number;
+  resolutionApplied?: DisputeResolution;
+  resolutionNote?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
 export interface Transaction {
   _id: string;
   type: string;
