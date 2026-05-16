@@ -22,7 +22,7 @@ export default function BlogsPageEditor() {
   if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl pb-32">
+    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
       <PageHeader
         title="Blogs page"
         description="Hero, filter chips, and newsletter CTA on the public /blogs listing page. Actual blog posts are managed under Blog Posts."

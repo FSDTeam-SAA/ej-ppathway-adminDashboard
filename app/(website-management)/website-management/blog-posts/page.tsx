@@ -14,6 +14,7 @@ import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatDate } from "../../../lib/format";
 import { fetchSiteContent } from "../../../lib/site-content";
+import { RichTextEditor } from "../../../components/website/RichTextEditor";
 import type { Blog } from "../../../lib/types";
 
 type BlogWithCategory = Blog & { category?: string; excerpt?: string; authorPhoto?: string };
@@ -62,7 +63,7 @@ export default function BlogPostsManagementPage() {
   };
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-6xl pb-16">
+    <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto pb-16">
       <PageHeader
         title="Blog Posts"
         description="Articles shown on the public /blogs page. Categories come from the Blogs Page editor."
@@ -258,7 +259,15 @@ function BlogModal({
         <FileFieldInline label="Author photo" file={profile} onChange={setProfile} existing={blog?.profilePicture} />
         <FileFieldInline label="Thumbnail" file={thumbnail} onChange={setThumbnail} existing={blog?.thumbnail} />
 
-        <Textarea label="Article content" rows={10} value={content} onChange={(e) => setContent(e.target.value)} className="font-mono text-sm" />
+        <RichTextEditor
+          label="Article content"
+          value={content}
+          onChange={setContent}
+          pageSlug="blogs"
+          sectionKey={blog ? `post-${blog._id}` : "post-new"}
+          placeholder="Write the article…"
+          minHeight={360}
+        />
 
         <label className="inline-flex items-center gap-2 text-sm">
           <input type="checkbox" checked={isPublished} onChange={(e) => setIsPublished(e.target.checked)} className="h-4 w-4 accent-[#0a7a90]" />

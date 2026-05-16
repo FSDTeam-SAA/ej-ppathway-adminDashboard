@@ -34,7 +34,7 @@ const CURATION = [
 
 export default function WebsiteManagementOverviewPage() {
   return (
-    <main className="px-6 md:px-10 py-8 max-w-6xl">
+    <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto">
       <PageHeader
         title="Website Management"
         description="Edit every piece of text, image, and video on the public Prophetic Pathway website."

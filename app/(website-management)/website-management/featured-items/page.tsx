@@ -43,7 +43,7 @@ export default function FeaturedItemsPage() {
   const [tab, setTab] = useState("advisors");
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-6xl pb-16">
+    <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto pb-16">
       <PageHeader
         title="Featured Items"
         description="Curate which advisors and reviews appear on the homepage. These pull from real records — no duplicate copies."

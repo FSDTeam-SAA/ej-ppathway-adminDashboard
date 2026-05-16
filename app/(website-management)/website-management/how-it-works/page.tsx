@@ -44,7 +44,7 @@ export default function HowItWorksEditorPage() {
   if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl pb-32">
+    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
       <PageHeader
         title="How it Works (Booking)"
         description="Walks visitors through booking — session types, scheduling, and cancellation."

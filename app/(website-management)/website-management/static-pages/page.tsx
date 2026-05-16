@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "../../../components/PageHeader";
 import { Spinner } from "../../../components/Spinner";
 import { Button } from "../../../components/ui/Button";
-import { Input, Textarea } from "../../../components/ui/Input";
+import { Input } from "../../../components/ui/Input";
 import { Tabs } from "../../../components/ui/Tabs";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
+import { RichTextEditor } from "../../../components/website/RichTextEditor";
 import type { CmsPage } from "../../../lib/types";
 
 const TABS = [
@@ -19,7 +20,7 @@ export default function StaticPagesEditor() {
   const [tab, setTab] = useState("privacy_policy");
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-4xl pb-16">
+    <main className="px-6 md:px-10 py-8 max-w-4xl mx-auto pb-16">
       <PageHeader
         title="Privacy & Terms"
         description="Long-form legal pages shown at /privacy and /terms."
@@ -80,12 +81,14 @@ function PageEditor({ slug, title }: { slug: string; title: string }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
       <Input label="Page title" value={pageTitle} onChange={(e) => setPageTitle(e.target.value)} />
-      <Textarea
-        label="Content (Markdown or HTML)"
-        rows={20}
+      <RichTextEditor
+        label="Content"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="font-mono text-sm"
+        onChange={setContent}
+        pageSlug="global"
+        sectionKey={`page-${slug}`}
+        placeholder="Write the page content…"
+        minHeight={480}
       />
       <Button onClick={save} loading={saving}>Save</Button>
     </div>
