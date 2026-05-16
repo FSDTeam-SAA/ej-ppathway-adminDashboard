@@ -36,6 +36,7 @@ const ITEMS: Item[] = [
   { label: "Compliance & Safety", href: "/compliance", icon: ShieldIcon, permission: "compliance.manage" },
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
   { label: "Subscription Plans", href: "/subscriptions", icon: CrownIcon, permission: "subscriptions.manage" },
+  { label: "Website Management", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
   { label: "Content (CMS)", href: "/content", icon: ContentIcon, permission: "cms.manage" },
   { label: "Chats", href: "/chats", icon: ChatIcon, permission: "chats.manage" },
   { label: "Sub Admins", href: "/sub-admins", icon: SubAdminIcon, permission: "sub_admins.manage" },
