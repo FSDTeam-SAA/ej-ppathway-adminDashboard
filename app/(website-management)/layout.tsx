@@ -37,12 +37,11 @@ const ITEMS: Item[] = [
   { href: "/website-management/join-as-advisor", label: "Join as Advisor", icon: ApproveIcon, group: "Pages" },
   { href: "/website-management/ethical-standards", label: "Ethical Standards", icon: ShieldIcon, group: "Pages" },
   { href: "/website-management/reviews", label: "Reviews / Satisfaction", icon: StarIcon, group: "Pages" },
-  { href: "/website-management/blogs", label: "Blogs Page", icon: ContentIcon, group: "Pages" },
+  { href: "/website-management/blogs", label: "Blogs", icon: ContentIcon, group: "Pages" },
   { href: "/website-management/about", label: "About", icon: ContentIcon, group: "Pages" },
   { href: "/website-management/contact", label: "Contact", icon: ChatIcon, group: "Pages" },
 
   { href: "/website-management/featured-items", label: "Featured Items", icon: StarIcon, group: "Curation" },
-  { href: "/website-management/blog-posts", label: "Blog Posts", icon: ContentIcon, group: "Curation" },
   { href: "/website-management/faqs", label: "FAQs", icon: FaqIcon, group: "Curation" },
   { href: "/website-management/static-pages", label: "Privacy & Terms", icon: ContentIcon, group: "Curation" },
 

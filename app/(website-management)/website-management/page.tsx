@@ -11,11 +11,6 @@ const CURATION = [
     description: "Curate which advisors and reviews appear on the homepage."
   },
   {
-    href: "/website-management/blog-posts",
-    title: "Blog Posts",
-    description: "Create, edit, and publish blog articles with thumbnails and categories."
-  },
-  {
     href: "/website-management/faqs",
     title: "FAQs",
     description: "Manage the FAQ list that appears across multiple pages."

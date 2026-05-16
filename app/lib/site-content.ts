@@ -11,7 +11,7 @@ export const SITE_CONTENT_PAGES = [
   { slug: "join-as-advisor", label: "Join as Advisor", description: "Hero, joining process, requirements, advisor testimonials." },
   { slug: "ethical-standards", label: "Ethical Standards", description: "Standards cards and commitment block for advisor applicants." },
   { slug: "reviews", label: "Reviews / Satisfaction", description: "Commitment cards, trust stats, resolution process, testimonials header." },
-  { slug: "blogs", label: "Blogs Page", description: "Hero, category chips, and newsletter CTA on the blogs index." },
+  { slug: "blogs", label: "Blogs", description: "Page hero, category chips, newsletter CTA, and the blog post articles themselves." },
   { slug: "about", label: "About", description: "Hero, story, values, and CTA on the About page." },
   { slug: "contact", label: "Contact", description: "Hero, contact info, quick help, and form settings." }
 ] as const;
