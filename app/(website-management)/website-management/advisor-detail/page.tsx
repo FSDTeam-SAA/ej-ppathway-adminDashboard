@@ -37,7 +37,7 @@ export default function AdvisorDetailEditorPage() {
     ed.updateSection("labels", { [k]: v });
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-4xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Advisor detail page"
         description="Labels for the public advisor profile page. The advisor's own data (name, bio, schedule, pricing) is managed under Advisor Management."

@@ -19,7 +19,7 @@ export default function AdvisorsListEditorPage() {
   if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-4xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Advisors list page"
         description="Page heading copy for the public /advisors directory."

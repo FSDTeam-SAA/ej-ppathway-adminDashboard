@@ -33,7 +33,7 @@ export default function ContactEditorPage() {
   if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Contact page"
         description="Public contact page. Form submissions land in the Inbox tab."

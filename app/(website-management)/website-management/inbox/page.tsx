@@ -107,7 +107,7 @@ export default function InboxPage() {
   };
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto pb-16">
+    <main className="px-6 md:px-10 py-8 w-full pb-16">
       <PageHeader
         title="Inbox"
         description="Messages submitted through the public contact form."

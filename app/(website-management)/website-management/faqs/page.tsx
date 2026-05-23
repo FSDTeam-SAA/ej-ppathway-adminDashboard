@@ -81,7 +81,7 @@ export default function FaqsPage() {
   const sorted = [...items].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-16">
+    <main className="px-6 md:px-10 py-8 w-full pb-16">
       <PageHeader
         title="FAQs"
         description="Frequently asked questions shown on multiple public pages."

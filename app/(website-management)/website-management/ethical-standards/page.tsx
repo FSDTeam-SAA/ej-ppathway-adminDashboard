@@ -24,7 +24,7 @@ export default function EthicalStandardsEditorPage() {
   if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Ethical Standards"
         description="Standards page that advisor applicants must read before applying."

@@ -67,7 +67,7 @@ export default function HomeEditorPage() {
   }
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Home page"
         description="The first thing visitors see — hero, how-it-works, why-choose, testimonials, CTA."

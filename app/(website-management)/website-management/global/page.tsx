@@ -47,7 +47,7 @@ export default function GlobalEditorPage() {
   }
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-5xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Global (Header & Footer)"
         description="Branding, navigation, and footer shared across every page of the site."

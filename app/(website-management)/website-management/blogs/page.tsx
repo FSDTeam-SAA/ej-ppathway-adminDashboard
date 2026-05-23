@@ -32,7 +32,7 @@ export default function BlogsAdminPage() {
   const [tab, setTab] = useState("page");
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto pb-32">
+    <main className="px-6 md:px-10 py-8 w-full pb-32">
       <PageHeader
         title="Blogs"
         description="Edit the public blogs page and manage individual articles."

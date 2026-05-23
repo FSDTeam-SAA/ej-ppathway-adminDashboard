@@ -20,7 +20,7 @@ export default function StaticPagesEditor() {
   const [tab, setTab] = useState("privacy_policy");
 
   return (
-    <main className="px-6 md:px-10 py-8 max-w-4xl mx-auto pb-16">
+    <main className="px-6 md:px-10 py-8 w-full pb-16">
       <PageHeader
         title="Privacy & Terms"
         description="Long-form legal pages shown at /privacy and /terms."
