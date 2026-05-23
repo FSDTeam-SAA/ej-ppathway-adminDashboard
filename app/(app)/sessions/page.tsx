@@ -7,7 +7,7 @@ import { Tabs } from "../../components/ui/Tabs";
 import { Avatar } from "../../components/ui/Avatar";
 import { StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
+import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
@@ -20,6 +20,8 @@ import {
   PlayIcon,
   VideoIcon,
 } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate, formatDuration } from "../../lib/format";
@@ -54,6 +56,9 @@ export default function SessionsPage() {
   const [details, setDetails] = useState<SessionItem | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<SessionItem | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
@@ -67,12 +72,30 @@ export default function SessionsPage() {
         ov[x._id] = x.count;
       });
       setOverview(ov);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load";
       toast.error(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/sessions/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok} session${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
   };
 
   useEffect(() => {
@@ -130,16 +153,28 @@ export default function SessionsPage() {
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={8} cols={9} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-500">
                   <tr className="border-b border-slate-100">
+                    <th className="pl-5 pr-2 py-4 font-medium w-10">
+                      <BulkCheckbox
+                        ariaLabel="Select all on this page"
+                        checked={bulk.allSelected}
+                        indeterminate={bulk.someSelected}
+                        onChange={bulk.toggleAll}
+                      />
+                    </th>
                     <th className="px-5 py-4 font-medium">Session ID</th>
                     <th className="px-5 py-4 font-medium">Client</th>
                     <th className="px-5 py-4 font-medium">Advisor</th>
@@ -153,13 +188,27 @@ export default function SessionsPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-10 text-slate-500">
+                      <td colSpan={9} className="text-center py-10 text-slate-500">
                         No sessions
                       </td>
                     </tr>
                   ) : (
-                    items.map((s) => (
-                      <tr key={s._id} className="border-b border-slate-50 last:border-0">
+                    items.map((s) => {
+                      const selected = bulk.isSelected(s._id);
+                      return (
+                      <tr
+                        key={s._id}
+                        className={`border-b border-slate-50 last:border-0 ${
+                          selected ? "bg-amber-50/60" : ""
+                        }`}
+                      >
+                        <td className="pl-5 pr-2 py-3 w-10">
+                          <BulkCheckbox
+                            ariaLabel={`Select session ${s.sessionCode || s._id}`}
+                            checked={selected}
+                            onChange={() => bulk.toggle(s._id)}
+                          />
+                        </td>
                         <td className="px-5 py-3 font-medium text-slate-900">
                           {s.sessionCode || s._id.slice(-6).toUpperCase()}
                         </td>
@@ -216,7 +265,8 @@ export default function SessionsPage() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -290,6 +340,19 @@ export default function SessionsPage() {
             </Button>
           </div>
         </Modal>
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={`Delete ${bulk.selectedCount} session${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="This permanently removes the selected session records and cannot be undone."
+          confirmText="Delete"
+          danger
+          loading={actionLoading}
+        />
       </main>
     </>
   );

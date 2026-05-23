@@ -8,7 +8,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Input, Textarea } from "../../../components/ui/Input";
-import { Spinner } from "../../../components/Spinner";
+import { Skeleton, CardSkeleton } from "../../../components/Skeleton";
 import { ChevronLeftIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
@@ -142,8 +142,25 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
         </button>
 
         {loading || !data ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <Skeleton className="h-22 w-22 rounded-full" />
+                  <div className="flex-1 space-y-3">
+                    <Skeleton className="h-5 w-1/2" />
+                    <Skeleton className="h-3 w-1/3" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+                <CardSkeleton />
+              </div>
+              <CardSkeleton />
+            </div>
+            <div className="space-y-4">
+              <CardSkeleton />
+              <CardSkeleton />
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

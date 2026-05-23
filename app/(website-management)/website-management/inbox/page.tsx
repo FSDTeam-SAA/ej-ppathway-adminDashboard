@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { Skeleton } from "../../../components/Skeleton";
 import { Button } from "../../../components/ui/Button";
 import { Badge } from "../../../components/ui/Badge";
 import { Textarea } from "../../../components/ui/Input";
@@ -126,7 +126,22 @@ export default function InboxPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-4">
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden max-h-[70vh] overflow-y-auto">
-          {loading ? <div className="p-8"><Spinner /></div> : items.length === 0 ? (
+          {loading ? (
+            <ul>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="px-4 py-3 border-b border-slate-100 last:border-0 flex items-center gap-3"
+                >
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-1/3" />
+                    <Skeleton className="h-2.5 w-2/3" />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : items.length === 0 ? (
             <div className="p-8 text-center text-sm text-slate-500">No messages.</div>
           ) : (
             <ul>

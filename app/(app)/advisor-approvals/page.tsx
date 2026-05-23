@@ -8,8 +8,11 @@ import { Tabs } from "../../components/ui/Tabs";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge, StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
+import { TableSkeleton } from "../../components/Skeleton";
 import { EyeIcon } from "../../components/Icons";
+import { ConfirmDialog } from "../../components/ui/Modal";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatDate } from "../../lib/format";
@@ -32,6 +35,10 @@ export default function AdvisorApprovalsPage() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
@@ -43,6 +50,7 @@ export default function AdvisorApprovalsPage() {
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load applications";
       toast.error(msg);
@@ -55,6 +63,24 @@ export default function AdvisorApprovalsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page, limit]);
+
+  const handleBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/advisor-applications/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0)
+      toast.success(`Deleted ${ok} application${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
+  };
 
   return (
     <>
@@ -72,16 +98,28 @@ export default function AdvisorApprovalsPage() {
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={6} cols={7} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-500">
                   <tr className="border-b border-slate-100">
+                    <th className="pl-5 pr-2 py-4 font-medium w-10">
+                      <BulkCheckbox
+                        ariaLabel="Select all on this page"
+                        checked={bulk.allSelected}
+                        indeterminate={bulk.someSelected}
+                        onChange={bulk.toggleAll}
+                      />
+                    </th>
                     <th className="px-5 py-4 font-medium">Advisor</th>
                     <th className="px-5 py-4 font-medium">Submitted</th>
                     <th className="px-5 py-4 font-medium">Type</th>
@@ -93,13 +131,27 @@ export default function AdvisorApprovalsPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-10 text-slate-500">
+                      <td colSpan={7} className="text-center py-10 text-slate-500">
                         No applications
                       </td>
                     </tr>
                   ) : (
-                    items.map((a) => (
-                      <tr key={a._id} className="border-b border-slate-50 last:border-0">
+                    items.map((a) => {
+                      const selected = bulk.isSelected(a._id);
+                      return (
+                      <tr
+                        key={a._id}
+                        className={`border-b border-slate-50 last:border-0 ${
+                          selected ? "bg-amber-50/60" : ""
+                        }`}
+                      >
+                        <td className="pl-5 pr-2 py-3 w-10">
+                          <BulkCheckbox
+                            ariaLabel={`Select ${a.user?.name || "application"}`}
+                            checked={selected}
+                            onChange={() => bulk.toggle(a._id)}
+                          />
+                        </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
                             <Avatar src={a.user?.profilePhoto} name={a.user?.name} size={32} />
@@ -128,7 +180,8 @@ export default function AdvisorApprovalsPage() {
                           </Link>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -144,6 +197,19 @@ export default function AdvisorApprovalsPage() {
             />
           </div>
         </div>
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={`Delete ${bulk.selectedCount} application${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="This permanently removes the selected applications and cannot be undone."
+          confirmText="Delete"
+          danger
+          loading={actionLoading}
+        />
       </main>
     </>
   );

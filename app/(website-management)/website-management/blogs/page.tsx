@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { FormSkeleton, CardSkeleton } from "../../../components/Skeleton";
 import { Button } from "../../../components/ui/Button";
 import { Input, Textarea, Select } from "../../../components/ui/Input";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
@@ -60,7 +60,7 @@ const DEFAULT: BlogsSections = { hero: {}, categories: [], newsletterCta: {} };
 
 function PageContentTab() {
   const ed = useSiteContentEditor<BlogsSections>("blogs", DEFAULT);
-  if (ed.loading) return <Spinner />;
+  if (ed.loading) return <FormSkeleton rows={5} />;
 
   return (
     <>
@@ -193,7 +193,11 @@ function BlogPostsTab() {
       </div>
 
       {loading ? (
-        <Spinner />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
           No blog posts yet. Click <span className="font-medium">Add new post</span> to create one.

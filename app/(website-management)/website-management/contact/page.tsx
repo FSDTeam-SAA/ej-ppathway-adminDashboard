@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { FormSkeleton } from "../../../components/Skeleton";
 import { Input, Textarea } from "../../../components/ui/Input";
 import { useSiteContentEditor } from "../../../lib/use-site-content-editor";
 import { SectionCard, FieldGrid } from "../../../components/website/SectionCard";
@@ -30,7 +30,7 @@ const DEFAULT: ContactSections = { hero: {}, contactInfo: { businessHours: [] },
 
 export default function ContactEditorPage() {
   const ed = useSiteContentEditor<ContactSections>("contact", DEFAULT);
-  if (ed.loading) return <main className="px-6 md:px-10 py-8"><Spinner /></main>;
+  if (ed.loading) return <main className="px-6 md:px-10 py-8"><FormSkeleton rows={6} /></main>;
 
   return (
     <main className="px-6 md:px-10 py-8 w-full pb-32">

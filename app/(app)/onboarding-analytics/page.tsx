@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { DonutChart, MiniArea } from "../../components/charts";
@@ -13,6 +13,7 @@ import {
   SmartphoneIcon,
   UsersIcon,
 } from "../../components/Icons";
+import { api } from "../../lib/api";
 
 type RangeKey = "today" | "this-week" | "this-month" | "custom";
 
@@ -23,8 +24,68 @@ const RANGE_LABEL: Record<RangeKey, string> = {
   custom: "Custom",
 };
 
+type FunnelStep = { label: string; value: number; pct: number };
+type DropOffRow = { step: string; users: number; rate: number };
+type PaywallSlice = { action: string; label: string; color: string; value: number; pct: number };
+type DeviceSlice = { device: string; label: string; color: string; value: number; pct: number };
+type TimelinePoint = { date: string; label: string; started: number; completed: number; completionRate: number };
+
+type AnalyticsResponse = {
+  range: { key: RangeKey; start: string; end: string; label: string };
+  stats: {
+    started: number;
+    completed: number;
+    completionRate: number;
+    avgCompletionMs: number;
+    avgCompletionLabel: string;
+    deltas: { startedAbs: number; completedAbs: number; completionRatePct: number };
+  };
+  funnel: FunnelStep[];
+  completionTimeline: TimelinePoint[];
+  dropOff: DropOffRow[];
+  paywall: { totalReached: number; breakdown: PaywallSlice[] };
+  devices: {
+    totalCompleted: number;
+    breakdown: DeviceSlice[];
+    mobileCompletionRate: number;
+    mobileCompletionDelta: number;
+  };
+};
+
+const FUNNEL_COLORS = [
+  "#c4b5fd", "#7dd3fc", "#bae6fd", "#86efac",
+  "#fde68a", "#fdba74", "#fda4af", "#fca5a5",
+];
+
 export default function OnboardingAnalyticsPage() {
-  const [dateLabel] = useState("May 07 - May 13, 2026");
+  const [range, setRange] = useState<RangeKey>("this-week");
+  const [data, setData] = useState<AnalyticsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api
+      .get<AnalyticsResponse>("/admin/onboarding-analytics", { range })
+      .then((res) => {
+        if (cancelled) return;
+        setData(res.data || null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err?.message || "Failed to load analytics");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [range]);
+
+  const dateLabel = data?.range.label ?? "—";
 
   return (
     <>
@@ -33,32 +94,40 @@ export default function OnboardingAnalyticsPage() {
         <PageHeader
           title="Onboarding Analytics"
           description="Track onboarding performance, user behavior and conversion metrics."
-          action={<DateRangePill value={dateLabel} />}
+          action={
+            <RangeSelector value={range} onChange={setRange} dateLabel={dateLabel} />
+          }
         />
+
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
             label="Onboarding Started"
-            value="12,580"
+            value={loading ? "—" : (data?.stats.started ?? 0).toLocaleString()}
             icon={<UsersIcon />}
             color="#a78bfa"
           />
           <StatCard
             label="Completed Onboarding"
-            value="7725"
+            value={loading ? "—" : (data?.stats.completed ?? 0).toLocaleString()}
             icon={<ApproveIcon />}
             color="#60a5fa"
           />
           <StatCard
             label="Completion Rate"
-            value="61.5%"
+            value={loading ? "—" : `${data?.stats.completionRate ?? 0}%`}
             icon={<CrownIcon />}
             color="#fbbf24"
           />
           <StatCard
             label="Avg. Completion Time"
-            value="1m 24s"
+            value={loading ? "—" : data?.stats.avgCompletionLabel || "0s"}
             icon={<ClockIcon />}
             color="#c084fc"
           />
@@ -67,32 +136,41 @@ export default function OnboardingAnalyticsPage() {
         {/* Funnel + Completion over time */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
           <Card>
-            <CardHeader title="Onboarding Funnel" range="this-week" />
-            <FunnelChart />
+            <CardHeader title="Onboarding Funnel" range={range} />
+            <FunnelChart steps={data?.funnel ?? []} />
           </Card>
 
           <Card>
-            <CardHeader title="Onboarding Completion Over Time" range="this-week" />
-            <CompletionLineChart />
+            <CardHeader title="Onboarding Completion Over Time" range={range} />
+            <CompletionLineChart points={data?.completionTimeline ?? []} />
           </Card>
         </div>
 
         {/* Drop-off + Paywall donut + Device donut */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <Card>
-            <CardHeader title="Drop-off Analysis" range="this-week" />
-            <DropOffTable />
+            <CardHeader title="Drop-off Analysis" range={range} />
+            <DropOffTable rows={data?.dropOff ?? []} />
           </Card>
 
           <Card>
-            <CardHeader title="Paywall Conversion Overview" range="this-week" />
-            <PaywallDonut />
+            <CardHeader title="Paywall Conversion Overview" range={range} />
+            <PaywallDonut
+              total={data?.paywall.totalReached ?? 0}
+              slices={data?.paywall.breakdown ?? []}
+            />
           </Card>
 
           <Card>
-            <CardHeader title="Completion Rate by Device" range="this-week" />
-            <DeviceDonut />
-            <MobileCompletionWidget rate={62.3} delta={6.1} />
+            <CardHeader title="Completion Rate by Device" range={range} />
+            <DeviceDonut
+              total={data?.devices.totalCompleted ?? 0}
+              slices={data?.devices.breakdown ?? []}
+            />
+            <MobileCompletionWidget
+              rate={data?.devices.mobileCompletionRate ?? 0}
+              delta={data?.devices.mobileCompletionDelta ?? 0}
+            />
           </Card>
         </div>
       </main>
@@ -128,27 +206,39 @@ function CardHeader({
   return (
     <div className="flex items-center justify-between mb-4">
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-      <RangePill value={range} />
+      <span className="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-slate-200 bg-white text-xs text-slate-700">
+        {RANGE_LABEL[range]}
+      </span>
     </div>
   );
 }
 
-function RangePill({ value }: { value: RangeKey }) {
+function RangeSelector({
+  value,
+  onChange,
+  dateLabel,
+}: {
+  value: RangeKey;
+  onChange: (r: RangeKey) => void;
+  dateLabel: string;
+}) {
   return (
-    <span className="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-slate-200 bg-white text-xs text-slate-700">
-      {RANGE_LABEL[value]}
+    <div className="inline-flex items-center gap-2">
+      <span className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-700">
+        <CalendarIcon size={16} className="text-[#0a7a90]" />
+        {dateLabel}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as RangeKey)}
+        className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-700"
+      >
+        <option value="today">Today</option>
+        <option value="this-week">This Week</option>
+        <option value="this-month">This Month</option>
+      </select>
       <ChevronDownIcon size={14} />
-    </span>
-  );
-}
-
-function DateRangePill({ value }: { value: string }) {
-  return (
-    <span className="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-700">
-      <CalendarIcon size={16} className="text-[#0a7a90]" />
-      {value}
-      <ChevronDownIcon size={14} />
-    </span>
+    </div>
   );
 }
 
@@ -188,41 +278,32 @@ function StatCard({
 
 // ---------- Funnel ----------
 
-const FUNNEL_STEPS = [
-  { label: "Users Signed UP", value: 12580, pct: 100, color: "#c4b5fd" },
-  { label: "Started Onboarding", value: 12580, pct: 100, color: "#7dd3fc" },
-  { label: "Completed  Step 1", value: 12580, pct: 100, color: "#bae6fd" },
-  { label: "Completed  Step2", value: 12580, pct: 100, color: "#86efac" },
-  { label: "Completed  Step 3", value: 12580, pct: 100, color: "#fde68a" },
-  { label: "Viewed Recommendations", value: 12580, pct: 100, color: "#fdba74" },
-  { label: "Viewed paywall", value: 12580, pct: 100, color: "#fda4af" },
-  { label: "Completed Payment", value: 12580, pct: 100, color: "#fca5a5" },
-];
-
-function FunnelChart() {
+function FunnelChart({ steps }: { steps: FunnelStep[] }) {
+  if (steps.length === 0) {
+    return <div className="text-sm text-slate-500 py-12 text-center">No data yet</div>;
+  }
   return (
     <div className="space-y-3">
-      {FUNNEL_STEPS.map((s, i) => {
-        // The widest bar in the mockup is at the top; each row narrows slightly.
+      {steps.map((s, i) => {
         const width = 100 - i * 5;
         return (
-          <div key={i} className="flex items-center gap-3">
+          <div key={s.label} className="flex items-center gap-3">
             <div className="flex-1">
               <div
                 className="rounded-full h-9 inline-flex items-center justify-center text-sm text-slate-800 font-medium"
                 style={{
                   width: `${width}%`,
-                  background: s.color,
+                  background: FUNNEL_COLORS[i % FUNNEL_COLORS.length],
                   minWidth: 220,
                 }}
               >
                 {s.label}
               </div>
             </div>
-            <div className="text-sm text-slate-700 font-medium w-14 text-right">
+            <div className="text-sm text-slate-700 font-medium w-16 text-right tabular-nums">
               {s.value.toLocaleString()}
             </div>
-            <div className="text-sm text-slate-700 font-semibold w-12 text-right">
+            <div className="text-sm text-slate-700 font-semibold w-14 text-right tabular-nums">
               {s.pct}%
             </div>
           </div>
@@ -232,22 +313,16 @@ function FunnelChart() {
   );
 }
 
-// ---------- Completion Over Time line chart ----------
+// ---------- Completion Over Time ----------
 
-const COMPLETION_DATA = [
-  { label: "Mon", value: 53 },
-  { label: "Tue", value: 55 },
-  { label: "Wed", value: 57 },
-  { label: "Thu", value: 90 },
-  { label: "Fri", value: 55 },
-  { label: "Sat", value: 75 },
-  { label: "Sun", value: 95 },
-];
-
-function CompletionLineChart() {
+function CompletionLineChart({ points }: { points: TimelinePoint[] }) {
+  if (points.length === 0) {
+    return <div className="h-80 flex items-center justify-center text-sm text-slate-500">No data yet</div>;
+  }
+  const data = points.map((p) => ({ label: p.label, value: p.completionRate }));
   return (
     <div className="h-80">
-      <AnnotatedLineChart data={COMPLETION_DATA} />
+      <AnnotatedLineChart data={data} />
     </div>
   );
 }
@@ -284,7 +359,7 @@ function AnnotatedLineChart({
     padY + innerH
   } L ${points[0][0]} ${padY + innerH} Z`;
 
-  const yTicks = [0, 300, 600, 900, 1200];
+  const yTicks = [0, 25, 50, 75, 100];
 
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`}>
@@ -351,18 +426,7 @@ function AnnotatedLineChart({
 
 // ---------- Drop-off table ----------
 
-const DROPOFFS = [
-  { step: "Step 1 : User Intent", rate: 12.7, users: 2580 },
-  { step: "Step2 : Guidance Style", rate: 12.7, users: 1710 },
-  { step: "Step 3 : Communication Method", rate: 12.7, users: 1130 },
-  { step: "Step 4 : Comfort & Personality", rate: 12.7, users: 970 },
-  { step: "Step 5 : Usage Frequency", rate: 12.7, users: 780 },
-  { step: "Step 6 : Focus Area", rate: 12.7, users: 1230 },
-  { step: "Step 7 : Trust Priorities", rate: 12.7, users: 1230 },
-  { step: "Step 8 : Review & complete", rate: 12.7, users: 1230 },
-];
-
-function DropOffTable() {
+function DropOffTable({ rows }: { rows: DropOffRow[] }) {
   return (
     <div>
       <div className="grid grid-cols-[1fr_140px_90px] text-xs text-slate-500 px-1 pb-3 border-b border-slate-100">
@@ -371,28 +435,32 @@ function DropOffTable() {
         <span className="text-right">Users Drop-off</span>
       </div>
       <div className="divide-y divide-slate-50">
-        {DROPOFFS.map((d) => (
-          <div
-            key={d.step}
-            className="grid grid-cols-[1fr_140px_90px] items-center py-3 text-sm"
-          >
-            <span className="text-slate-700 pr-2 leading-tight">{d.step}</span>
-            <div className="flex items-center gap-2 pr-3">
-              <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[#0a7a90]"
-                  style={{ width: `${Math.min(100, d.rate * 4)}%` }}
-                />
+        {rows.length === 0 ? (
+          <div className="text-sm text-slate-500 py-6 text-center">No data yet</div>
+        ) : (
+          rows.map((d) => (
+            <div
+              key={d.step}
+              className="grid grid-cols-[1fr_140px_90px] items-center py-3 text-sm"
+            >
+              <span className="text-slate-700 pr-2 leading-tight">{d.step}</span>
+              <div className="flex items-center gap-2 pr-3">
+                <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[#0a7a90]"
+                    style={{ width: `${Math.min(100, d.rate)}%` }}
+                  />
+                </div>
+                <span className="text-slate-700 font-medium tabular-nums">
+                  {d.rate}%
+                </span>
               </div>
-              <span className="text-slate-700 font-medium tabular-nums">
-                {d.rate}%
+              <span className="text-right text-slate-700 tabular-nums">
+                {d.users.toLocaleString()}
               </span>
             </div>
-            <span className="text-right text-slate-700 tabular-nums">
-              {d.users.toLocaleString()}
-            </span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -400,30 +468,23 @@ function DropOffTable() {
 
 // ---------- Paywall donut ----------
 
-const PAYWALL = [
-  { label: "Wallet Selected", value: 1360, pct: 32.0, color: "#10b981" },
-  { label: "Subscription Selected", value: 1150, pct: 27.1, color: "#fbbf24" },
-  { label: "Payment Completed", value: 1020, pct: 24.0, color: "#bae6fd" },
-  { label: "Abandoned", value: 720, pct: 16.9, color: "#0a7a90" },
-];
-
-function PaywallDonut() {
+function PaywallDonut({ total, slices }: { total: number; slices: PaywallSlice[] }) {
   const data = useMemo(
-    () => PAYWALL.map((p) => ({ label: p.label, value: p.value, color: p.color })),
-    []
+    () => slices.map((p) => ({ label: p.label, value: p.value, color: p.color })),
+    [slices]
   );
   return (
     <div className="flex flex-col items-center">
       <DonutChart
         data={data}
-        centerLabel="4250"
+        centerLabel={total.toLocaleString()}
         centerSub="Users Reached pay wall"
         showLegend={false}
       />
       <div className="mt-4 w-full space-y-3">
-        {PAYWALL.map((p) => (
+        {slices.map((p) => (
           <div
-            key={p.label}
+            key={p.action}
             className="flex items-center justify-between text-sm"
           >
             <span className="flex items-center gap-2 text-slate-700">
@@ -446,31 +507,25 @@ function PaywallDonut() {
 
 // ---------- Device donut ----------
 
-const DEVICES = [
-  { label: "Mobile app", value: 5160, pct: 66.8, color: "#10b981" },
-  { label: "Mobile Web", value: 1780, pct: 23.1, color: "#fbbf24" },
-  { label: "Desktop", value: 785, pct: 10.1, color: "#0a7a90" },
-];
-
-function DeviceDonut() {
+function DeviceDonut({ total, slices }: { total: number; slices: DeviceSlice[] }) {
   return (
     <div className="flex items-center gap-4">
       <DonutChart
-        data={DEVICES.map((d) => ({
+        data={slices.map((d) => ({
           label: d.label,
           value: d.value,
           color: d.color,
         }))}
         size={170}
         thickness={28}
-        centerLabel="7,725"
+        centerLabel={total.toLocaleString()}
         centerSub="Completed Users"
         showLegend={false}
       />
       <div className="flex-1 space-y-2">
-        {DEVICES.map((d) => (
+        {slices.map((d) => (
           <div
-            key={d.label}
+            key={d.device}
             className="flex items-center justify-between text-sm"
           >
             <span className="flex items-center gap-2 text-slate-700">
@@ -498,6 +553,7 @@ function MobileCompletionWidget({
   rate: number;
   delta: number;
 }) {
+  const sign = delta >= 0 ? "+" : "";
   return (
     <div className="mt-5 rounded-xl bg-[#e6f2f6]/80 px-4 py-3 flex items-center gap-3">
       <div className="h-11 w-11 rounded-lg bg-white inline-flex items-center justify-center text-[#0a7a90]">
@@ -512,9 +568,8 @@ function MobileCompletionWidget({
         </div>
       </div>
       <div className="text-xs text-[#0a7a90] font-medium whitespace-nowrap">
-        {delta.toFixed(1)}% From last week
+        {sign}{delta.toFixed(1)}% From last week
       </div>
     </div>
   );
 }
-

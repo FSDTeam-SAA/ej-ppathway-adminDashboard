@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
-import { Spinner } from "../../components/Spinner";
+import { CardSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Textarea } from "../../components/ui/Input";
@@ -183,8 +183,10 @@ export default function SubscriptionsPage() {
         </div>
 
         {loading ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <CardSkeleton key={i} className="h-64" />
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

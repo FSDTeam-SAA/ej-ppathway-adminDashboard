@@ -8,11 +8,13 @@ import { Tabs } from "../../components/ui/Tabs";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge, StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
+import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Input, Textarea } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { EyeIcon, PlusIcon, StarIcon, SuspendIcon } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency } from "../../lib/format";
@@ -35,8 +37,12 @@ export default function AdvisorsPage() {
 
   const [confirm, setConfirm] = useState<AdvisorListItem | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const [addOpen, setAddOpen] = useState(false);
+
+  const bulk = useBulkSelection(items.map((it) => it.user));
 
   const load = async () => {
     setLoading(true);
@@ -48,12 +54,30 @@ export default function AdvisorsPage() {
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load advisors";
       toast.error(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/advisors/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok} advisor${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
   };
 
   useEffect(() => {
@@ -100,16 +124,28 @@ export default function AdvisorsPage() {
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={8} cols={8} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-500 uppercase text-xs tracking-wide">
                   <tr className="border-b border-slate-100">
+                    <th className="pl-5 pr-2 py-4 font-semibold w-10">
+                      <BulkCheckbox
+                        ariaLabel="Select all on this page"
+                        checked={bulk.allSelected}
+                        indeterminate={bulk.someSelected}
+                        onChange={bulk.toggleAll}
+                      />
+                    </th>
                     <th className="px-5 py-4 font-semibold">Advisor</th>
                     <th className="px-5 py-4 font-semibold">Ratings</th>
                     <th className="px-5 py-4 font-semibold">Price</th>
@@ -122,7 +158,7 @@ export default function AdvisorsPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-500">
+                      <td colSpan={8} className="text-center py-10 text-slate-500">
                         No advisors
                       </td>
                     </tr>
@@ -132,8 +168,21 @@ export default function AdvisorsPage() {
                       const price = it.profile?.pricing?.video || it.profile?.pricing?.call || it.profile?.pricing?.chat;
                       const sessions = it.profile?.totalSessions || 0;
                       const tier = it.profile?.tier || "bronze";
+                      const selected = bulk.isSelected(it.user._id);
                       return (
-                        <tr key={it.user._id} className="border-b border-slate-50 last:border-0">
+                        <tr
+                          key={it.user._id}
+                          className={`border-b border-slate-50 last:border-0 ${
+                            selected ? "bg-amber-50/60" : ""
+                          }`}
+                        >
+                          <td className="pl-5 pr-2 py-3 w-10">
+                            <BulkCheckbox
+                              ariaLabel={`Select ${it.user.name}`}
+                              checked={selected}
+                              onChange={() => bulk.toggle(it.user._id)}
+                            />
+                          </td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar src={it.user.profilePhoto} name={it.user.name} size={32} />
@@ -209,6 +258,19 @@ export default function AdvisorsPage() {
           confirmText={confirm?.user.status === "suspended" ? "Unsuspend" : "Suspend"}
           danger={confirm?.user.status !== "suspended"}
           loading={confirmLoading}
+        />
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={`Delete ${bulk.selectedCount} advisor${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="This deactivates the selected advisor accounts."
+          confirmText="Delete"
+          danger
+          loading={actionLoading}
         />
 
         <AddAdvisorModal

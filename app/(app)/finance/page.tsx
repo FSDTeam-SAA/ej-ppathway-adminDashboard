@@ -7,10 +7,12 @@ import { Tabs } from "../../components/ui/Tabs";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
+import { Skeleton, TableSkeleton } from "../../components/Skeleton";
 import { Button } from "../../components/ui/Button";
-import { Modal } from "../../components/ui/Modal";
+import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { EyeIcon, DollarIcon, ClockIcon, UsersIcon } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate } from "../../lib/format";
@@ -92,6 +94,11 @@ function TransactionsTab() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<Transaction | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const bulk = useBulkSelection(items);
 
   useEffect(() => {
     setLoading(true);
@@ -100,138 +107,198 @@ function TransactionsTab() {
       .then((r) => {
         setItems(r.data || []);
         setTotal(r.meta?.total || 0);
+        bulk.clear();
       })
       .catch((err: unknown) => {
         const msg = err instanceof ApiError ? err.message : "Failed";
         toast.error(msg);
       })
       .finally(() => setLoading(false));
-  }, [page, limit, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, reloadKey]);
+
+  const handleBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/finance/transactions/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0)
+      toast.success(`Deleted ${ok} transaction${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    setReloadKey((k) => k + 1);
+  };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-      {loading ? (
-        <div className="py-20 flex justify-center text-[#0a7a90]">
-          <Spinner size={32} />
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-slate-500">
-              <tr className="border-b border-slate-100">
-                <th className="px-5 py-4 font-medium">User</th>
-                <th className="px-5 py-4 font-medium">Transactions ID</th>
-                <th className="px-5 py-4 font-medium">Type</th>
-                <th className="px-5 py-4 font-medium">Amount</th>
-                <th className="px-5 py-4 font-medium">Date & Time</th>
-                <th className="px-5 py-4 font-medium text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-10 text-slate-500">
-                    No transactions
-                  </td>
-                </tr>
-              ) : (
-                items.map((t) => {
-                  const isPositive = !["advisor_payout", "session_refund"].includes(t.type);
-                  return (
-                    <tr key={t._id} className="border-b border-slate-50 last:border-0">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <Avatar
-                            src={t.user?.profilePhoto || t.advisor?.profilePhoto}
-                            name={t.user?.name || t.advisor?.name}
-                            size={28}
-                          />
-                          <span>{t.user?.name || t.advisor?.name || "—"}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 font-medium text-slate-900">
-                        TXN-{t._id.slice(-4).toUpperCase()}
-                      </td>
-                      <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
-                      <td className="px-5 py-3">
-                        <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
-                          {isPositive ? "+" : "-"}
-                          {formatCurrency(Math.abs(t.amount))}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setDetails(t)}
-                          className="inline-flex items-center gap-1.5 text-emerald-600 hover:underline text-sm font-medium"
-                        >
-                          <EyeIcon size={16} /> Review Details
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="px-5 py-3">
-        <Pagination
-          page={page}
-          limit={limit}
-          total={total}
-          onPage={setPage}
-          onLimit={(l) => {
-            setLimit(l);
-            setPage(1);
-          }}
-        />
-      </div>
+    <div>
+      <BulkActionsBar
+        selectedCount={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setBulkConfirm(true)}
+      />
 
-      <Modal
-        open={!!details}
-        onClose={() => setDetails(null)}
-        title="Transaction details"
-        size="md"
-      >
-        {details && (
-          <div className="space-y-3 text-sm">
-            <DetailRow label="Transaction ID" value={`TXN-${details._id.slice(-4).toUpperCase()}`} mono />
-            <DetailRow label="Full ID" value={details._id} mono />
-            <DetailRow label="Type" value={details.type.replace(/_/g, " ")} capitalize />
-            <DetailRow label="Status" value={details.status} capitalize />
-            {details.withdrawalStatus && (
-              <DetailRow label="Withdrawal status" value={details.withdrawalStatus} capitalize />
-            )}
-            <DetailRow
-              label="Amount"
-              value={
-                (details.amount < 0 ? "-" : "+") +
-                formatCurrency(Math.abs(details.amount))
-              }
-              tone={details.amount < 0 ? "danger" : "success"}
-            />
-            <DetailRow label="Date" value={formatDate(details.createdAt, true)} />
-            {details.user && (
-              <DetailRow
-                label="User"
-                value={`${details.user.name} (${details.user.email})`}
-              />
-            )}
-            {details.advisor && (
-              <DetailRow
-                label="Advisor"
-                value={`${details.advisor.name} (${details.advisor.email})`}
-              />
-            )}
-            {details.description && (
-              <DetailRow label="Description" value={details.description} />
-            )}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <TableSkeleton rows={8} cols={7} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500">
+                <tr className="border-b border-slate-100">
+                  <th className="pl-5 pr-2 py-4 font-medium w-10">
+                    <BulkCheckbox
+                      ariaLabel="Select all on this page"
+                      checked={bulk.allSelected}
+                      indeterminate={bulk.someSelected}
+                      onChange={bulk.toggleAll}
+                    />
+                  </th>
+                  <th className="px-5 py-4 font-medium">User</th>
+                  <th className="px-5 py-4 font-medium">Transactions ID</th>
+                  <th className="px-5 py-4 font-medium">Type</th>
+                  <th className="px-5 py-4 font-medium">Amount</th>
+                  <th className="px-5 py-4 font-medium">Date & Time</th>
+                  <th className="px-5 py-4 font-medium text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-slate-500">
+                      No transactions
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((t) => {
+                    const isPositive = !["advisor_payout", "session_refund"].includes(t.type);
+                    const selected = bulk.isSelected(t._id);
+                    return (
+                      <tr
+                        key={t._id}
+                        className={`border-b border-slate-50 last:border-0 ${
+                          selected ? "bg-amber-50/60" : ""
+                        }`}
+                      >
+                        <td className="pl-5 pr-2 py-3 w-10">
+                          <BulkCheckbox
+                            ariaLabel={`Select transaction TXN-${t._id.slice(-4).toUpperCase()}`}
+                            checked={selected}
+                            onChange={() => bulk.toggle(t._id)}
+                          />
+                        </td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <Avatar
+                              src={t.user?.profilePhoto || t.advisor?.profilePhoto}
+                              name={t.user?.name || t.advisor?.name}
+                              size={28}
+                            />
+                            <span>{t.user?.name || t.advisor?.name || "—"}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 font-medium text-slate-900">
+                          TXN-{t._id.slice(-4).toUpperCase()}
+                        </td>
+                        <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
+                        <td className="px-5 py-3">
+                          <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
+                            {isPositive ? "+" : "-"}
+                            {formatCurrency(Math.abs(t.amount))}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setDetails(t)}
+                            className="inline-flex items-center gap-1.5 text-emerald-600 hover:underline text-sm font-medium"
+                          >
+                            <EyeIcon size={16} /> Review Details
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         )}
-      </Modal>
+        <div className="px-5 py-3">
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPage={setPage}
+            onLimit={(l) => {
+              setLimit(l);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <Modal
+          open={!!details}
+          onClose={() => setDetails(null)}
+          title="Transaction details"
+          size="md"
+        >
+          {details && (
+            <div className="space-y-3 text-sm">
+              <DetailRow label="Transaction ID" value={`TXN-${details._id.slice(-4).toUpperCase()}`} mono />
+              <DetailRow label="Full ID" value={details._id} mono />
+              <DetailRow label="Type" value={details.type.replace(/_/g, " ")} capitalize />
+              <DetailRow label="Status" value={details.status} capitalize />
+              {details.withdrawalStatus && (
+                <DetailRow label="Withdrawal status" value={details.withdrawalStatus} capitalize />
+              )}
+              <DetailRow
+                label="Amount"
+                value={
+                  (details.amount < 0 ? "-" : "+") +
+                  formatCurrency(Math.abs(details.amount))
+                }
+                tone={details.amount < 0 ? "danger" : "success"}
+              />
+              <DetailRow label="Date" value={formatDate(details.createdAt, true)} />
+              {details.user && (
+                <DetailRow
+                  label="User"
+                  value={`${details.user.name} (${details.user.email})`}
+                />
+              )}
+              {details.advisor && (
+                <DetailRow
+                  label="Advisor"
+                  value={`${details.advisor.name} (${details.advisor.email})`}
+                />
+              )}
+              {details.description && (
+                <DetailRow label="Description" value={details.description} />
+              )}
+            </div>
+          )}
+        </Modal>
+      </div>
+
+      <ConfirmDialog
+        open={bulkConfirm}
+        onClose={() => setBulkConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${bulk.selectedCount} transaction${
+          bulk.selectedCount === 1 ? "" : "s"
+        }?`}
+        description="This permanently removes the selected transaction records and cannot be undone."
+        confirmText="Delete"
+        danger
+        loading={actionLoading}
+      />
     </div>
   );
 }
@@ -337,9 +404,7 @@ function PayoutsTab() {
         {total} pending advisor payout request{total === 1 ? "" : "s"} awaiting approval.
       </div>
       {loading ? (
-        <div className="py-12 flex justify-center text-[#0a7a90]">
-          <Spinner size={32} />
-        </div>
+        <TableSkeleton rows={6} cols={5} />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -445,8 +510,14 @@ function CommissionsTab() {
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
       <h2 className="text-2xl font-bold text-slate-900 mb-5">Commission by Tier</h2>
       {loading ? (
-        <div className="py-8 flex justify-center text-[#0a7a90]">
-          <Spinner size={28} />
+        <div className="space-y-4 max-w-3xl">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+          ))}
+          <Skeleton className="h-10 w-40 rounded-lg" />
         </div>
       ) : (
         <div className="space-y-6 max-w-3xl">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
+import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
@@ -97,9 +97,7 @@ export default function SubAdminsPage() {
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={6} cols={6} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
