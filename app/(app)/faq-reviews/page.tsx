@@ -17,8 +17,10 @@ import {
   TrashIcon,
   UploadIcon,
 } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import type { Faq, ShowcaseReview } from "../../lib/types";
 
 export default function FaqReviewPage() {
@@ -75,13 +77,17 @@ function FaqSection() {
   const [editing, setEditing] = useState<Faq | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Faq | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
     try {
       const r = await api.get<Faq[]>("/cms/admin/faqs");
       setItems(r.data || []);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
@@ -91,6 +97,7 @@ function FaqSection() {
   };
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submitDelete = async () => {
@@ -109,6 +116,23 @@ function FaqSection() {
     }
   };
 
+  const submitBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/cms/faqs/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok} FAQ${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
+  };
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
@@ -117,6 +141,12 @@ function FaqSection() {
           <PlusIcon size={16} /> Add New FAQ
         </Button>
       </div>
+
+      <BulkActionsBar
+        selectedCount={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setBulkConfirm(true)}
+      />
 
       {loading ? (
         <div className="py-20 flex justify-center text-[#0a7a90]">
@@ -130,12 +160,24 @@ function FaqSection() {
         <div className="space-y-3">
           {items.map((f) => {
             const isOpen = open === f._id;
+            const selected = bulk.isSelected(f._id);
             return (
               <div
                 key={f._id}
-                className="bg-white rounded-2xl border border-slate-100 px-5 py-4"
+                className={`bg-white rounded-2xl border px-5 py-4 ${
+                  selected
+                    ? "border-[#0a7a90]/60 ring-2 ring-[#0a7a90]/20"
+                    : "border-slate-100"
+                }`}
               >
                 <div className="flex items-start gap-4">
+                  <span className="pt-1.5">
+                    <BulkCheckbox
+                      ariaLabel={`Select FAQ ${f.question}`}
+                      checked={selected}
+                      onChange={() => bulk.toggle(f._id)}
+                    />
+                  </span>
                   <button
                     type="button"
                     className="flex-1 text-left font-semibold text-lg text-slate-900"
@@ -201,6 +243,18 @@ function FaqSection() {
         onConfirm={submitDelete}
         title="Delete FAQ?"
         description="This FAQ will be permanently removed."
+        danger
+        loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={bulkConfirm}
+        onClose={() => setBulkConfirm(false)}
+        onConfirm={submitBulkDelete}
+        title={`Delete ${bulk.selectedCount} FAQ${
+          bulk.selectedCount === 1 ? "" : "s"
+        }?`}
+        description="The selected FAQs will be permanently removed."
+        confirmText="Delete"
         danger
         loading={actionLoading}
       />
@@ -291,13 +345,17 @@ function ReviewsSection() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ShowcaseReview | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<ShowcaseReview | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
     try {
       const r = await api.get<ShowcaseReview[]>("/reviews/showcase");
       setItems(r.data || []);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
@@ -307,6 +365,7 @@ function ReviewsSection() {
   };
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submitDelete = async () => {
@@ -325,6 +384,24 @@ function ReviewsSection() {
     }
   };
 
+  const submitBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/reviews/showcase/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0)
+      toast.success(`Deleted ${ok} review${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
+  };
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
@@ -333,6 +410,12 @@ function ReviewsSection() {
           <PlusIcon size={16} /> Create New Review
         </Button>
       </div>
+
+      <BulkActionsBar
+        selectedCount={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setBulkConfirm(true)}
+      />
 
       {loading ? (
         <div className="py-20 flex justify-center text-[#0a7a90]">
@@ -344,27 +427,40 @@ function ReviewsSection() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {items.map((r) => (
+          {items.map((r) => {
+            const selected = bulk.isSelected(r._id);
+            return (
             <div
               key={r._id}
-              className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm"
+              className={`bg-white rounded-2xl border p-5 shadow-sm ${
+                selected
+                  ? "border-[#0a7a90]/60 ring-2 ring-[#0a7a90]/20"
+                  : "border-slate-100"
+              }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <button
-                  type="button"
-                  onClick={() => setEditing(r)}
-                  className="inline-flex items-center gap-1.5 text-emerald-600 text-sm font-medium hover:underline"
-                >
-                  <EditIcon size={14} /> Edit Details
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteConfirm(r)}
-                  className="h-8 w-8 rounded-full border border-red-200 text-red-500 inline-flex items-center justify-center hover:bg-red-50"
-                  aria-label="Delete"
-                >
-                  <TrashIcon size={14} />
-                </button>
+                <BulkCheckbox
+                  ariaLabel={`Select review by ${r.showcaseName || ""}`}
+                  checked={selected}
+                  onChange={() => bulk.toggle(r._id)}
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditing(r)}
+                    className="inline-flex items-center gap-1.5 text-emerald-600 text-sm font-medium hover:underline"
+                  >
+                    <EditIcon size={14} /> Edit Details
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirm(r)}
+                    className="h-8 w-8 rounded-full border border-red-200 text-red-500 inline-flex items-center justify-center hover:bg-red-50"
+                    aria-label="Delete"
+                  >
+                    <TrashIcon size={14} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between mb-3">
@@ -393,7 +489,8 @@ function ReviewsSection() {
                 {r.comment?.replace(/<[^>]*>/g, "")}
               </p>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -420,6 +517,18 @@ function ReviewsSection() {
         onConfirm={submitDelete}
         title="Delete review?"
         description="This review will be permanently removed."
+        danger
+        loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={bulkConfirm}
+        onClose={() => setBulkConfirm(false)}
+        onConfirm={submitBulkDelete}
+        title={`Delete ${bulk.selectedCount} review${
+          bulk.selectedCount === 1 ? "" : "s"
+        }?`}
+        description="The selected reviews will be permanently removed."
+        confirmText="Delete"
         danger
         loading={actionLoading}
       />

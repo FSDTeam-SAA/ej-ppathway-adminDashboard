@@ -11,8 +11,10 @@ import { Tabs } from "../../../components/ui/Tabs";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Badge } from "../../../components/ui/Badge";
 import { PlusIcon, EditIcon, TrashIcon, UploadIcon } from "../../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../../components/BulkActionsBar";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
+import { useBulkSelection } from "../../../lib/use-bulk-selection";
 import { formatDate } from "../../../lib/format";
 import { useSiteContentEditor } from "../../../lib/use-site-content-editor";
 import { fetchSiteContent } from "../../../lib/site-content";
@@ -120,7 +122,10 @@ function BlogPostsTab() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<BlogWithCategory | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<BlogWithCategory | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
@@ -132,6 +137,7 @@ function BlogPostsTab() {
       setItems(blogs.data || []);
       const cats = (blogsContent.sections.categories || []).filter((c) => c && c !== "All");
       setCategories(cats);
+      bulk.clear();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Load failed");
     } finally {
@@ -155,8 +161,31 @@ function BlogPostsTab() {
     }
   };
 
+  const submitBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/cms/blogs/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok} post${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
+  };
+
   return (
     <>
+      <BulkActionsBar
+        selectedCount={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setBulkConfirm(true)}
+      />
+
       <div className="flex justify-end mb-4">
         <Button onClick={() => setCreating(true)}>
           <PlusIcon size={16} /> Add new post
@@ -171,8 +200,17 @@ function BlogPostsTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {items.map((b) => (
-            <article key={b._id} className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col">
+          {items.map((b) => {
+            const selected = bulk.isSelected(b._id);
+            return (
+            <article
+              key={b._id}
+              className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
+                selected
+                  ? "border-[#0a7a90]/60 ring-2 ring-[#0a7a90]/20"
+                  : "border-slate-200"
+              }`}
+            >
               <div className="aspect-video bg-slate-100 relative">
                 {b.thumbnail ? (
                   <Image src={b.thumbnail} alt={b.title} fill className="object-cover" sizes="320px" unoptimized />
@@ -180,6 +218,13 @@ function BlogPostsTab() {
                 {b.category ? (
                   <Badge tone="info" className="absolute top-3 left-3">{b.category}</Badge>
                 ) : null}
+                <span className="absolute top-3 right-3 bg-white/90 rounded p-1 shadow">
+                  <BulkCheckbox
+                    ariaLabel={`Select blog ${b.title}`}
+                    checked={selected}
+                    onChange={() => bulk.toggle(b._id)}
+                  />
+                </span>
               </div>
               <div className="p-4 flex flex-col flex-1">
                 <h3 className="font-semibold text-slate-900 line-clamp-2 mb-1">{b.title}</h3>
@@ -205,7 +250,8 @@ function BlogPostsTab() {
                 </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -228,6 +274,18 @@ function BlogPostsTab() {
         onConfirm={submitDelete}
         title="Delete blog post?"
         description={`"${deleteConfirm?.title}" will be permanently removed.`}
+        danger
+        loading={actionLoading}
+      />
+      <ConfirmDialog
+        open={bulkConfirm}
+        onClose={() => setBulkConfirm(false)}
+        onConfirm={submitBulkDelete}
+        title={`Delete ${bulk.selectedCount} blog post${
+          bulk.selectedCount === 1 ? "" : "s"
+        }?`}
+        description="The selected blog posts will be permanently removed."
+        confirmText="Delete"
         danger
         loading={actionLoading}
       />

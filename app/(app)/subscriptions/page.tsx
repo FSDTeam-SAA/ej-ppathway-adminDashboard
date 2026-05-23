@@ -8,8 +8,10 @@ import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Textarea } from "../../components/ui/Input";
 import { CrownIcon, EditIcon, PlusIcon, TrashIcon, UsersIcon } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { formatCompact, formatCurrency } from "../../lib/format";
 import { AreaChart, DonutChart, MiniArea } from "../../components/charts";
 import type { Plan, SubscriptionStats } from "../../lib/types";
@@ -24,7 +26,10 @@ export default function SubscriptionsPage() {
   const [editing, setEditing] = useState<Plan | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Plan | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const bulk = useBulkSelection(plans);
 
   const load = async () => {
     setLoading(true);
@@ -35,6 +40,7 @@ export default function SubscriptionsPage() {
       ]);
       setPlans(p.data || []);
       setStats(s.data || null);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
@@ -61,6 +67,23 @@ export default function SubscriptionsPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const submitBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/subscriptions/plans/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0) toast.success(`Deleted ${ok} plan${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
   };
 
   const planDistribution = stats?.planDistribution.map((p, i) => ({
@@ -134,7 +157,26 @@ export default function SubscriptionsPage() {
           </div>
         </div>
 
-        <div className="flex justify-end mb-3">
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
+        <div className="flex items-center justify-between mb-3">
+          {plans.length > 0 ? (
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <BulkCheckbox
+                ariaLabel="Select all plans"
+                checked={bulk.allSelected}
+                indeterminate={bulk.someSelected}
+                onChange={bulk.toggleAll}
+              />
+              Select all
+            </label>
+          ) : (
+            <span />
+          )}
           <Button onClick={() => setCreating(true)}>
             <PlusIcon size={16} /> Add New
           </Button>
@@ -154,9 +196,20 @@ export default function SubscriptionsPage() {
               plans.map((p) => (
                 <div
                   key={p._id}
-                  className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col"
+                  className={`relative bg-white rounded-2xl p-6 border shadow-sm flex flex-col transition-colors ${
+                    bulk.isSelected(p._id)
+                      ? "border-[#0a7a90]/60 ring-2 ring-[#0a7a90]/20"
+                      : "border-slate-100"
+                  }`}
                 >
-                  <h3 className="text-2xl font-bold text-slate-900">{p.name}</h3>
+                  <div className="absolute top-4 left-4">
+                    <BulkCheckbox
+                      ariaLabel={`Select plan ${p.name}`}
+                      checked={bulk.isSelected(p._id)}
+                      onChange={() => bulk.toggle(p._id)}
+                    />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 pl-8">{p.name}</h3>
                   <p className="text-slate-500 text-sm mb-4">
                     {p.audienceLimit || p.description || "—"}
                   </p>
@@ -221,6 +274,19 @@ export default function SubscriptionsPage() {
           onConfirm={submitDelete}
           title="Delete plan?"
           description={`Plan "${deleteConfirm?.name}" will be deactivated.`}
+          danger
+          loading={actionLoading}
+        />
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={submitBulkDelete}
+          title={`Delete ${bulk.selectedCount} plan${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="The selected plans will be deactivated."
+          confirmText="Delete"
           danger
           loading={actionLoading}
         />

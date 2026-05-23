@@ -5,13 +5,15 @@ import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Pagination } from "../../components/ui/Pagination";
 import { Spinner } from "../../components/Spinner";
-import { Modal } from "../../components/ui/Modal";
+import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Select } from "../../components/ui/Input";
 import { StatusBadge } from "../../components/ui/Badge";
 import { EyeIcon, PlusIcon, SuspendIcon } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import type { AdminUser } from "../../lib/types";
 
 export default function SubAdminsPage() {
@@ -24,6 +26,28 @@ export default function SubAdminsPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [viewing, setViewing] = useState<AdminUser | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const bulk = useBulkSelection(items);
+
+  const submitBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setBulkLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/sub-admins/${id}`))
+    );
+    setBulkLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0)
+      toast.success(`Deactivated ${ok} sub-admin${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -35,6 +59,7 @@ export default function SubAdminsPage() {
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
       setPermissions(p.data || []);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
@@ -64,6 +89,12 @@ export default function SubAdminsPage() {
           }
         />
 
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
             <div className="py-20 flex justify-center text-[#0a7a90]">
@@ -74,6 +105,14 @@ export default function SubAdminsPage() {
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-500">
                   <tr className="border-b border-slate-100">
+                    <th className="pl-5 pr-2 py-4 font-medium w-10">
+                      <BulkCheckbox
+                        ariaLabel="Select all sub-admins on this page"
+                        checked={bulk.allSelected}
+                        indeterminate={bulk.someSelected}
+                        onChange={bulk.toggleAll}
+                      />
+                    </th>
                     <th className="px-5 py-4 font-medium">Name</th>
                     <th className="px-5 py-4 font-medium">Email</th>
                     <th className="px-5 py-4 font-medium">Password</th>
@@ -85,13 +124,27 @@ export default function SubAdminsPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-10 text-slate-500">
+                      <td colSpan={7} className="text-center py-10 text-slate-500">
                         No sub-admins
                       </td>
                     </tr>
                   ) : (
-                    items.map((u) => (
-                      <tr key={u._id} className="border-b border-slate-50 last:border-0">
+                    items.map((u) => {
+                      const selected = bulk.isSelected(u._id);
+                      return (
+                      <tr
+                        key={u._id}
+                        className={`border-b border-slate-50 last:border-0 ${
+                          selected ? "bg-amber-50/60" : ""
+                        }`}
+                      >
+                        <td className="pl-5 pr-2 py-3 w-10">
+                          <BulkCheckbox
+                            ariaLabel={`Select ${u.name}`}
+                            checked={selected}
+                            onChange={() => bulk.toggle(u._id)}
+                          />
+                        </td>
                         <td className="px-5 py-3 text-slate-900 font-medium">{u.name}</td>
                         <td className="px-5 py-3 text-slate-600">{u.email}</td>
                         <td className="px-5 py-3 text-slate-500">**********</td>
@@ -114,7 +167,8 @@ export default function SubAdminsPage() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -152,6 +206,19 @@ export default function SubAdminsPage() {
             load();
           }}
           permissionList={permissions}
+        />
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={submitBulkDelete}
+          title={`Delete ${bulk.selectedCount} sub-admin${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="The selected sub-admin accounts will be deactivated."
+          confirmText="Delete"
+          danger
+          loading={bulkLoading}
         />
       </main>
     </>

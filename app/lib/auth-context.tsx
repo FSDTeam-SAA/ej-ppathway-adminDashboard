@@ -54,13 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMe]);
 
   // Route guard: redirect logged-out away from protected routes,
-  // and logged-in away from /login.
+  // and logged-in away from auth routes.
   useEffect(() => {
     if (loading) return;
-    const isLogin = pathname?.startsWith("/login");
-    if (!user && !isLogin) {
+    const isAuthRoute =
+      pathname === "/login" ||
+      pathname === "/forgot" ||
+      pathname === "/verify" ||
+      pathname === "/reset";
+    if (!user && !isAuthRoute) {
       router.replace("/login");
-    } else if (user && isLogin) {
+    } else if (user && isAuthRoute) {
       router.replace("/");
     }
   }, [loading, user, pathname, router]);

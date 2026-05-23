@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
@@ -13,6 +14,7 @@ import {
   DollarIcon,
   FaqIcon,
   LogoutIcon,
+  OnboardingIcon,
   SessionIcon,
   SettingIcon,
   ShieldIcon,
@@ -30,13 +32,14 @@ type Item = {
 const ITEMS: Item[] = [
   { label: "Dashboard Overview", href: "/", icon: DashboardIcon },
   { label: "Users Management", href: "/users", icon: UsersIcon, permission: "users.manage" },
+  { label: "Onboarding Analytics", href: "/onboarding-analytics", icon: OnboardingIcon, permission: "analytics.view" },
   { label: "Advisor Approvals", href: "/advisor-approvals", icon: ApproveIcon, permission: "advisors.approve" },
   { label: "Advisor Management", href: "/advisors", icon: AdvisorIcon, permission: "advisors.manage" },
   { label: "Session Management", href: "/sessions", icon: SessionIcon, permission: "sessions.manage" },
   { label: "Compliance & Safety", href: "/compliance", icon: ShieldIcon, permission: "compliance.manage" },
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
   { label: "Subscription Plans", href: "/subscriptions", icon: CrownIcon, permission: "subscriptions.manage" },
-  { label: "Website Management", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
+  { label: "Content (CMS)", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
   { label: "Chats", href: "/chats", icon: ChatIcon, permission: "chats.manage" },
   { label: "Sub Admins", href: "/sub-admins", icon: SubAdminIcon, permission: "sub_admins.manage" },
   { label: "FAQ & Review Management", href: "/faq-reviews", icon: FaqIcon, permission: "faq.manage" },
@@ -45,7 +48,7 @@ const ITEMS: Item[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, hasPermission } = useAuth();
+  const { logout, hasPermission } = useAuth();
 
   const visible = ITEMS.filter((it) => {
     if (!it.permission) return true;
@@ -53,14 +56,19 @@ export function Sidebar() {
   });
 
   return (
-    <aside className="hidden md:flex flex-col w-64 shrink-0 bg-[#dff1f6] border-r border-[#cbe4eb] h-screen sticky top-0">
-      <div className="px-6 py-5 border-b border-[#cbe4eb]">
-        <div className="font-semibold text-lg leading-tight text-slate-900">
-          Prophetic <br />
-          <span className="text-[#0a7a90] font-normal text-base">PATHWAY</span>
-        </div>
+    <aside className="hidden md:flex flex-col w-64 shrink-0 bg-[#dff1f6] h-screen sticky top-0">
+      <div className="px-6 pt-6 pb-4 flex justify-center">
+        <Image
+          src="/logo.png"
+          alt="Prophetic Pathway"
+          width={180}
+          height={64}
+          priority
+          className="h-auto w-40 object-contain"
+        />
       </div>
-      <nav className="flex-1 overflow-y-auto py-3 px-3">
+
+      <nav className="flex-1 overflow-y-auto px-3">
         <ul className="space-y-1">
           {visible.map((it) => {
             const isActive =
@@ -74,8 +82,8 @@ export function Sidebar() {
                   href={it.href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                     isActive
-                      ? "bg-[#0a7a90] text-white font-medium"
-                      : "text-slate-700 hover:bg-white"
+                      ? "bg-[#0a7a90] text-white font-medium shadow-sm"
+                      : "text-slate-700 hover:bg-white/60"
                   }`}
                 >
                   <Icon size={18} />
@@ -86,16 +94,12 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
-      <div className="p-3 border-t border-[#cbe4eb]">
-        {user && (
-          <div className="px-3 py-2 mb-2 text-xs text-slate-600 truncate">
-            {user.role === "admin" ? "Super Admin" : user.role}
-          </div>
-        )}
+
+      <div className="p-4">
         <button
           type="button"
           onClick={logout}
-          className="w-full flex items-center justify-center gap-2 h-11 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium text-sm"
+          className="w-full flex items-center justify-center gap-2 h-11 rounded-lg border border-red-400 text-red-500 hover:bg-red-50 font-medium text-sm"
         >
           <LogoutIcon size={18} /> Log out
         </button>

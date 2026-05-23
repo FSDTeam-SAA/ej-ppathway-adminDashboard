@@ -259,3 +259,49 @@ export const ActivityIcon = (p: IconProps) => (
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
   </I>
 );
+export const MailIcon = (p: IconProps) => (
+  <I {...p}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <polyline points="22 6 12 13 2 6" />
+  </I>
+);
+export const LockIcon = (p: IconProps) => (
+  <I {...p}>
+    <rect x="3" y="11" width="18" height="11" rx="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </I>
+);
+export const EyeOffIcon = (p: IconProps) => (
+  <I {...p}>
+    <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.66 19.66 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.66 19.66 0 0 1-3.17 4.5" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+    <path d="M14.12 14.12a3 3 0 0 1-4.24-4.24" />
+  </I>
+);
+export const CalendarIcon = (p: IconProps) => (
+  <I {...p}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </I>
+);
+export const SmartphoneIcon = (p: IconProps) => (
+  <I {...p}>
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+    <line x1="12" y1="18" x2="12" y2="18" />
+  </I>
+);
+export const OnboardingIcon = (p: IconProps) => (
+  <I {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M7 14l4-4 3 3 5-6" />
+  </I>
+);
+export const ShieldCheckIcon = (p: IconProps) => (
+  <I {...p}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <polyline points="9 12 11 14 15 10" />
+  </I>
+);
