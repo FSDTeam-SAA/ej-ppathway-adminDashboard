@@ -7,7 +7,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { ConfirmDialog } from "../../components/ui/Modal";
-import { Spinner } from "../../components/Spinner";
+import { TableSkeleton } from "../../components/Skeleton";
 import {
   BulkActionsBar,
   BulkCheckbox,
@@ -180,9 +180,7 @@ export default function UsersListPage() {
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={8} cols={8} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

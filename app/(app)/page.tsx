@@ -13,7 +13,7 @@ import {
   MiniArea,
 } from "../components/charts";
 import { useToast } from "../lib/toast";
-import { Spinner } from "../components/Spinner";
+import { StatGridSkeleton, CardSkeleton } from "../components/Skeleton";
 import { formatCompact, formatCurrency } from "../lib/format";
 import { Avatar } from "../components/ui/Avatar";
 import {
@@ -45,34 +45,22 @@ const monthLabels = [
 export default function DashboardPage() {
   const toast = useToast();
   const [data, setData] = useState<DashboardOverview | null>(null);
-  const [sessionsTotal, setSessionsTotal] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancel = false;
     setLoading(true);
-    Promise.allSettled([
-      api.get<DashboardOverview>("/admin/dashboard/overview"),
-      api.get<{ totalSessions?: number }>("/admin/dashboard/sessions-total"),
-      api.get<Transaction[]>("/admin/transactions", { limit: 4 }),
-    ])
-      .then(([overviewRes, sessRes, txRes]) => {
+    api
+      .get<DashboardOverview>("/admin/dashboard/overview")
+      .then((res) => {
         if (cancel) return;
-        if (overviewRes.status === "fulfilled") {
-          setData(overviewRes.value.data || null);
-        } else {
-          const e = overviewRes.reason;
-          const msg =
-            e instanceof ApiError ? e.message : "Failed to load dashboard";
-          toast.error(msg);
-        }
-        if (sessRes.status === "fulfilled") {
-          setSessionsTotal(sessRes.value.data?.totalSessions ?? null);
-        }
-        if (txRes.status === "fulfilled") {
-          setTransactions(txRes.value.data || []);
-        }
+        setData(res.data || null);
+      })
+      .catch((e) => {
+        if (cancel) return;
+        const msg =
+          e instanceof ApiError ? e.message : "Failed to load dashboard";
+        toast.error(msg);
       })
       .finally(() => {
         if (!cancel) setLoading(false);
@@ -81,6 +69,9 @@ export default function DashboardPage() {
       cancel = true;
     };
   }, [toast]);
+
+  const sessionsTotal = data?.totals.sessions ?? null;
+  const transactions = data?.recentTransactions || [];
 
   const userBars = useMemo(() => {
     const counts = new Array(7).fill(0);
@@ -145,8 +136,17 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={36} />
+          <div className="space-y-6">
+            <StatGridSkeleton count={5} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <CardSkeleton className="h-80" />
+              <CardSkeleton className="h-80" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <CardSkeleton className="h-64" />
+              <CardSkeleton className="h-64" />
+              <CardSkeleton className="h-64" />
+            </div>
           </div>
         ) : (
           <>

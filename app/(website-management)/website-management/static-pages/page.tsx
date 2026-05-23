@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { FormSkeleton } from "../../../components/Skeleton";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { Tabs } from "../../../components/ui/Tabs";
@@ -76,7 +76,7 @@ function PageEditor({ slug, title }: { slug: string; title: string }) {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading) return <FormSkeleton rows={4} />;
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">

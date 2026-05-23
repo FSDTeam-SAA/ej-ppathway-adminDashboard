@@ -25,12 +25,10 @@ export function Spinner({ size = 24, className = "" }: { size?: number; classNam
   );
 }
 
+import { FullPageSkeleton } from "./Skeleton";
+
 export function FullPageLoader() {
-  return (
-    <div className="min-h-[60vh] flex items-center justify-center text-[#0a7a90]">
-      <Spinner size={36} />
-    </div>
-  );
+  return <FullPageSkeleton />;
 }
 
 export function EmptyState({

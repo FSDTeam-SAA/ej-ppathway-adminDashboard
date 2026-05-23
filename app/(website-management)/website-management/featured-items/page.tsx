@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { Skeleton, TableSkeleton } from "../../../components/Skeleton";
 import { Tabs } from "../../../components/ui/Tabs";
 import { Avatar } from "../../../components/ui/Avatar";
 import { StarIcon } from "../../../components/Icons";
@@ -95,7 +95,12 @@ function FeaturedAdvisorsTab() {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading)
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <TableSkeleton rows={6} cols={5} />
+      </div>
+    );
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -196,7 +201,23 @@ function FeaturedReviewsTab() {
         </select>
       </div>
 
-      {loading ? <Spinner /> : (
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-4"
+            >
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-3/4" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="space-y-3">
           {items.map((r) => {
             const displayName = r.isAdminShowcase ? r.showcaseName : r.user?.name;

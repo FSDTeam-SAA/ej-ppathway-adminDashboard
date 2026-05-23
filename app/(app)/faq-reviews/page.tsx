@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
-import { Spinner } from "../../components/Spinner";
+import { Skeleton, CardSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Textarea } from "../../components/ui/Input";
@@ -149,8 +149,19 @@ function FaqSection() {
       />
 
       {loading ? (
-        <div className="py-20 flex justify-center text-[#0a7a90]">
-          <Spinner size={32} />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-3"
+            >
+              <Skeleton className="h-8 w-8 rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center text-slate-500">
@@ -418,8 +429,10 @@ function ReviewsSection() {
       />
 
       {loading ? (
-        <div className="py-20 flex justify-center text-[#0a7a90]">
-          <Spinner size={32} />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="bg-white rounded-2xl p-10 text-center text-slate-500">

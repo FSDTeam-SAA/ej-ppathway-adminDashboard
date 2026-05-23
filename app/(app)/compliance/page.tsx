@@ -7,11 +7,13 @@ import { Tabs } from "../../components/ui/Tabs";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { Spinner } from "../../components/Spinner";
-import { Modal } from "../../components/ui/Modal";
+import { TableSkeleton } from "../../components/Skeleton";
+import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Textarea } from "../../components/ui/Input";
 import { EyeIcon, ShieldIcon, PdfIcon, UploadIcon } from "../../components/Icons";
+import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
+import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate } from "../../lib/format";
@@ -92,6 +94,9 @@ function ComplaintsSection() {
   const [resolveOpen, setResolveOpen] = useState(false);
   const [note, setNote] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+
+  const bulk = useBulkSelection(items);
 
   const load = async () => {
     setLoading(true);
@@ -105,12 +110,31 @@ function ComplaintsSection() {
       const m = (r.meta || {}) as ListMeta;
       setTotal(m.total || 0);
       if (m.totals) setTotals(m.totals);
+      bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const ids = bulk.selectedArray;
+    const results = await Promise.allSettled(
+      ids.map((id) => api.delete(`/admin/complaints/${id}`))
+    );
+    setActionLoading(false);
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const ok = results.length - failed;
+    if (ok > 0)
+      toast.success(`Deleted ${ok} complaint${ok === 1 ? "" : "s"}`);
+    if (failed > 0)
+      toast.error(`${failed} delete${failed === 1 ? "" : "s"} failed`);
+    setBulkConfirm(false);
+    load();
   };
 
   useEffect(() => {
@@ -148,16 +172,28 @@ function ComplaintsSection() {
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
+        <BulkActionsBar
+          selectedCount={bulk.selectedCount}
+          onClear={bulk.clear}
+          onDelete={() => setBulkConfirm(true)}
+        />
+
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="py-20 flex justify-center text-[#0a7a90]">
-              <Spinner size={32} />
-            </div>
+            <TableSkeleton rows={8} cols={8} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-slate-500">
                   <tr className="border-b border-slate-100">
+                    <th className="pl-5 pr-2 py-4 font-medium w-10">
+                      <BulkCheckbox
+                        ariaLabel="Select all on this page"
+                        checked={bulk.allSelected}
+                        indeterminate={bulk.someSelected}
+                        onChange={bulk.toggleAll}
+                      />
+                    </th>
                     <th className="px-5 py-4 font-medium">User Name</th>
                     <th className="px-5 py-4 font-medium">User Mail</th>
                     <th className="px-5 py-4 font-medium">Joined</th>
@@ -170,13 +206,27 @@ function ComplaintsSection() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-500">
+                      <td colSpan={8} className="text-center py-10 text-slate-500">
                         No complaints
                       </td>
                     </tr>
                   ) : (
-                    items.map((c) => (
-                      <tr key={c._id} className="border-b border-slate-50 last:border-0">
+                    items.map((c) => {
+                      const selected = bulk.isSelected(c._id);
+                      return (
+                      <tr
+                        key={c._id}
+                        className={`border-b border-slate-50 last:border-0 ${
+                          selected ? "bg-amber-50/60" : ""
+                        }`}
+                      >
+                        <td className="pl-5 pr-2 py-3 w-10">
+                          <BulkCheckbox
+                            ariaLabel={`Select ${c.user?.name || "complaint"}`}
+                            checked={selected}
+                            onChange={() => bulk.toggle(c._id)}
+                          />
+                        </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
                             <Avatar src={c.user?.profilePhoto} name={c.user?.name} size={32} />
@@ -203,7 +253,8 @@ function ComplaintsSection() {
                           </button>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -311,6 +362,19 @@ function ComplaintsSection() {
             </div>
           )}
         </Modal>
+
+        <ConfirmDialog
+          open={bulkConfirm}
+          onClose={() => setBulkConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title={`Delete ${bulk.selectedCount} complaint${
+            bulk.selectedCount === 1 ? "" : "s"
+          }?`}
+          description="This permanently removes the selected complaints and cannot be undone."
+          confirmText="Delete"
+          danger
+          loading={actionLoading}
+        />
     </div>
   );
 }
@@ -478,9 +542,7 @@ function DisputesSection() {
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
-          </div>
+          <TableSkeleton rows={8} cols={6} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

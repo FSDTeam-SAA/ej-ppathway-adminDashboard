@@ -286,12 +286,14 @@ export interface DashboardOverview {
     users: number;
     advisors: number;
     subscriptions: number;
+    sessions: number;
     revenue: number;
   };
   usersByDay: Array<{ _id: number; count: number }>;
   advisorsByCategory: Array<{ _id: string | null; count: number }>;
   revenueByMonth: Array<{ _id: { y: number; m: number }; total: number }>;
   popularCategories: Array<{ _id: string | null; count: number }>;
+  recentTransactions: Transaction[];
 }
 
 export interface FinanceOverview {

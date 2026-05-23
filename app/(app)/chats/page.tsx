@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Avatar } from "../../components/ui/Avatar";
-import { Spinner } from "../../components/Spinner";
+import { ListSkeleton } from "../../components/Skeleton";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatRelative } from "../../lib/format";
@@ -52,9 +52,7 @@ export default function ChatsPage() {
         />
 
         {loading ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
-          </div>
+          <ListSkeleton count={6} />
         ) : items.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 text-center text-slate-500">
             No conversations yet

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "../../../components/Topbar";
 import { Avatar } from "../../../components/ui/Avatar";
-import { Spinner } from "../../../components/Spinner";
+import { Skeleton } from "../../../components/Skeleton";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { useAuth } from "../../../lib/auth-context";
@@ -99,8 +99,17 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
 
         <div className="bg-white rounded-b-2xl border border-slate-100 shadow-sm flex flex-col h-[calc(100vh-220px)]">
           {loading ? (
-            <div className="flex-1 flex items-center justify-center text-[#0a7a90]">
-              <Spinner size={32} />
+            <div className="flex-1 p-5 space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}
+                >
+                  <Skeleton
+                    className={`h-12 rounded-2xl ${i % 2 === 0 ? "w-1/2" : "w-1/3"}`}
+                  />
+                </div>
+              ))}
             </div>
           ) : (
             <>

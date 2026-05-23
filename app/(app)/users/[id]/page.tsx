@@ -11,7 +11,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
-import { Spinner } from "../../../components/Spinner";
+import { DetailSkeleton } from "../../../components/Skeleton";
 import { formatCurrency, formatDate } from "../../../lib/format";
 import type { UserDetailsResponse } from "../../../lib/types";
 import { DollarIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
@@ -126,9 +126,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
         />
 
         {loading || !data ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
-          </div>
+          <DetailSkeleton />
         ) : (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
             <div className="flex flex-col items-center text-center mb-6">

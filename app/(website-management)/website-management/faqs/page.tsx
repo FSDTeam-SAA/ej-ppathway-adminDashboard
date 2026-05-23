@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "../../../components/PageHeader";
-import { Spinner } from "../../../components/Spinner";
+import { Skeleton } from "../../../components/Skeleton";
 import { Button } from "../../../components/ui/Button";
 import { Input, Textarea } from "../../../components/ui/Input";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
@@ -93,7 +93,22 @@ export default function FaqsPage() {
         }
       />
 
-      {loading ? <Spinner /> : (
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3"
+            >
+              <Skeleton className="h-8 w-8 rounded" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="space-y-2">
           {sorted.map((faq, i) => (
             <div key={faq._id} className="bg-white rounded-xl border border-slate-200 p-4">

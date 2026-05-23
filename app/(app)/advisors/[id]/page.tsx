@@ -7,7 +7,7 @@ import { PageHeader } from "../../../components/PageHeader";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
-import { Spinner } from "../../../components/Spinner";
+import { DetailSkeleton } from "../../../components/Skeleton";
 import { ConfirmDialog } from "../../../components/ui/Modal";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
@@ -88,9 +88,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
         />
 
         {loading || !data ? (
-          <div className="py-20 flex justify-center text-[#0a7a90]">
-            <Spinner size={32} />
-          </div>
+          <DetailSkeleton />
         ) : (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
             <div className="flex flex-col items-center text-center mb-6">
