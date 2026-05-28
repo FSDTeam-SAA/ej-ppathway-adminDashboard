@@ -446,12 +446,12 @@ function TransactionRow({ tx }: { tx: Transaction }) {
         })}
       </td>
       <td className="py-3">
-        <button
-          type="button"
+        <Link
+          href={`/finance?txn=${tx._id}`}
           className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md bg-[#e6f2f6] text-[#0a7a90] text-xs font-medium hover:bg-[#d0e6ec]"
         >
           <EyeIcon size={14} /> Review Details
-        </button>
+        </Link>
       </td>
     </tr>
   );

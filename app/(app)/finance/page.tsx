@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Tabs } from "../../components/ui/Tabs";
@@ -27,8 +28,11 @@ const TABS = [
 
 export default function FinancePage() {
   const toast = useToast();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [tab, setTab] = useState("transactions");
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const initialTxnId = searchParams.get("txn") || undefined;
 
   useEffect(() => {
     api
@@ -39,6 +43,13 @@ export default function FinancePage() {
         toast.error(msg);
       });
   }, [toast]);
+
+  const handleTxnOpened = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("txn");
+    const qs = params.toString();
+    router.replace(qs ? `/finance?${qs}` : "/finance", { scroll: false });
+  };
 
   return (
     <>
@@ -78,7 +89,12 @@ export default function FinancePage() {
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
         </div>
 
-        {tab === "transactions" && <TransactionsTab />}
+        {tab === "transactions" && (
+          <TransactionsTab
+            initialTxnId={initialTxnId}
+            onInitialTxnOpened={handleTxnOpened}
+          />
+        )}
         {tab === "payouts" && <PayoutsTab />}
         {tab === "commissions" && <CommissionsTab />}
       </main>
@@ -86,7 +102,13 @@ export default function FinancePage() {
   );
 }
 
-function TransactionsTab() {
+function TransactionsTab({
+  initialTxnId,
+  onInitialTxnOpened,
+}: {
+  initialTxnId?: string;
+  onInitialTxnOpened?: () => void;
+}) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>([]);
   const [page, setPage] = useState(1);
@@ -97,6 +119,7 @@ function TransactionsTab() {
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const openedRef = useRef(false);
 
   const bulk = useBulkSelection(items);
 
@@ -105,9 +128,18 @@ function TransactionsTab() {
     api
       .get<Transaction[]>("/admin/finance/transactions", { page, limit })
       .then((r) => {
-        setItems(r.data || []);
+        const loaded = r.data || [];
+        setItems(loaded);
         setTotal(r.meta?.total || 0);
         bulk.clear();
+        if (initialTxnId && !openedRef.current) {
+          const match = loaded.find((t) => t._id === initialTxnId);
+          if (match) {
+            openedRef.current = true;
+            setDetails(match);
+            onInitialTxnOpened?.();
+          }
+        }
       })
       .catch((err: unknown) => {
         const msg = err instanceof ApiError ? err.message : "Failed";

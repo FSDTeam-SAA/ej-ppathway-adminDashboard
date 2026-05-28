@@ -286,6 +286,28 @@ export default function AdvisorsPage() {
   );
 }
 
+function CopyField({ label, value }: { label: string; value: string }) {
+  const toast = useToast();
+  const copy = () => {
+    navigator.clipboard.writeText(value).then(() => toast.success(`${label} copied`));
+  };
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div>
+        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="text-sm font-medium text-slate-900 break-all">{value}</p>
+      </div>
+      <button
+        type="button"
+        onClick={copy}
+        className="shrink-0 text-xs font-medium text-[#0a7a90] hover:underline"
+      >
+        Copy
+      </button>
+    </div>
+  );
+}
+
 function AddAdvisorModal({
   open,
   onClose,
@@ -309,6 +331,7 @@ function AddAdvisorModal({
     bio: "",
   });
   const [loading, setLoading] = useState(false);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
 
   const onChange = (k: keyof typeof form, v: string) =>
     setForm((s) => ({ ...s, [k]: v }));
@@ -321,7 +344,7 @@ function AddAdvisorModal({
     setLoading(true);
     try {
       await api.post("/admin/advisors", form);
-      toast.success("Advisor created");
+      setCreated({ email: form.email, password: form.password });
       onCreated();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
@@ -331,8 +354,34 @@ function AddAdvisorModal({
     }
   };
 
+  const handleClose = () => {
+    setCreated(null);
+    setForm({ name: "", email: "", phoneNumber: "", location: "", language: "", password: "", experience: "", type: "", style: "", bio: "" });
+    onClose();
+  };
+
+  if (created) {
+    return (
+      <Modal open={open} onClose={handleClose} title="Advisor Account Created" size="md">
+        <div className="space-y-4">
+          <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
+            Account created successfully. Share these login credentials with the advisor — they can login to the Advisor Dashboard immediately.
+          </div>
+          <CopyField label="Email" value={created.email} />
+          <CopyField label="Password" value={created.password} />
+          <p className="text-xs text-slate-500">
+            A welcome email has also been sent to the advisor (if email is configured).
+          </p>
+          <Button className="w-full" onClick={handleClose}>
+            Done
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Add an Advisor Manually" size="lg">
+    <Modal open={open} onClose={handleClose} title="Add an Advisor Manually" size="lg">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Enter Email"
@@ -400,7 +449,7 @@ function AddAdvisorModal({
         />
       </div>
       <div className="grid grid-cols-2 gap-3 mt-5">
-        <Button variant="outline" onClick={onClose}>
+        <Button variant="outline" onClick={handleClose}>
           Not Now
         </Button>
         <Button onClick={submit} loading={loading}>

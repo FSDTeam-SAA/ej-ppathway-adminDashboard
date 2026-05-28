@@ -81,7 +81,7 @@ export function Topbar({
             <div className="text-sm font-semibold text-slate-900">
               {user?.name || "Admin"}
             </div>
-            <div className="text-xs text-slate-500">{user?.email}</div>
+            <div className="text-xs text-slate-500">{user?.role}</div>
           </div>
         </div>
       </div>
