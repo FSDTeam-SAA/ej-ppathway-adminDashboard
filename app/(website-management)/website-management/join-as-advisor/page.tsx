@@ -17,7 +17,7 @@ type Card = { icon?: string; title?: string; description?: string };
 type StatItem = { value?: string; label?: string };
 
 type JoinSections = {
-  hero?: { title?: string; subtitle?: string; ctaPrimary?: Link };
+  hero?: { title?: string; subtitle?: string; backgroundImage?: string; ctaPrimary?: Link };
   joiningProcess?: { sectionLabel?: string; title?: string; subtitle?: string; steps?: Step[] };
   application?: { stepLabel?: string; title?: string; description?: string; bullets?: string[]; image?: string; ctaPrimary?: Link };
   interview?: { stepLabel?: string; title?: string; description?: string; image?: string; ctaPrimary?: Link };
@@ -25,8 +25,8 @@ type JoinSections = {
   reachStats?: { eyebrow?: string; title?: string; subtitle?: string; image?: string; items?: StatItem[] };
   whyJoin?: { sectionLabel?: string; title?: string; subtitle?: string; cards?: Card[] };
   requirements?: { title?: string; bullets?: string[]; image?: string };
-  advisorTestimonials?: { sectionLabel?: string; title?: string; videos?: { name?: string; videoUrl?: string; thumbnail?: string }[] };
-  beforeYouApply?: { title?: string; body?: string; ctaPrimary?: Link; footnote?: string };
+  advisorTestimonials?: { sectionLabel?: string; title?: string; videos?: { name?: string; quote?: string; videoUrl?: string; thumbnail?: string }[] };
+  beforeYouApply?: { eyebrow?: string; title?: string; body?: string; ctaPrimary?: Link; footnote?: string };
 };
 
 const DEFAULT: JoinSections = {
@@ -59,6 +59,15 @@ export default function JoinAsAdvisorEditorPage() {
           onChange={(e) => ed.updateSection("hero", { title: e.target.value })} />
         <Textarea label="Subtitle" rows={2} value={ed.sections.hero?.subtitle || ""}
           onChange={(e) => ed.updateSection("hero", { subtitle: e.target.value })} />
+        <div className="max-w-sm">
+          <ImageUploadField
+            pageSlug="join-as-advisor"
+            sectionKey="hero"
+            label="Background Image"
+            value={ed.sections.hero?.backgroundImage}
+            onChange={(url) => ed.updateSection("hero", { backgroundImage: url })}
+          />
+        </div>
         <LinkField label="Apply button" value={ed.sections.hero?.ctaPrimary}
           onChange={(v) => ed.updateSection("hero", { ctaPrimary: v })} />
       </SectionCard>
@@ -229,6 +238,8 @@ export default function JoinAsAdvisorEditorPage() {
             <div className="space-y-3">
               <Input label="Advisor name" value={v.name || ""}
                 onChange={(e) => update({ ...v, name: e.target.value })} />
+              <Textarea label="Quote / testimonial" rows={2} value={v.quote || ""}
+                onChange={(e) => update({ ...v, quote: e.target.value })} />
               <FieldGrid cols={2}>
                 <VideoUploadField
                   pageSlug="join-as-advisor"
@@ -251,6 +262,8 @@ export default function JoinAsAdvisorEditorPage() {
       </SectionCard>
 
       <SectionCard title="Before You Apply">
+        <Input label="Eyebrow" value={ed.sections.beforeYouApply?.eyebrow || ""}
+          onChange={(e) => ed.updateSection("beforeYouApply", { eyebrow: e.target.value })} />
         <Input label="Title" value={ed.sections.beforeYouApply?.title || ""}
           onChange={(e) => ed.updateSection("beforeYouApply", { title: e.target.value })} />
         <Textarea label="Body" rows={3} value={ed.sections.beforeYouApply?.body || ""}

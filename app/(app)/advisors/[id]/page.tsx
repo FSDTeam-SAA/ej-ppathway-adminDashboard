@@ -14,6 +14,7 @@ import { useToast } from "../../../lib/toast";
 import { formatCurrency } from "../../../lib/format";
 import type { AdvisorProfile, AdminUser, Wallet } from "../../../lib/types";
 import { StarIcon } from "../../../components/Icons";
+import { MapPin } from "lucide-react";
 
 type AdvisorDetailsResponse = {
   user: AdminUser;
@@ -95,7 +96,10 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               <Avatar src={data.user.profilePhoto} name={data.user.name} size={92} />
               <h2 className="text-2xl font-bold text-slate-900 mt-3">{data.user.name}</h2>
               <p className="text-slate-500">{data.profile?.professionalTitle || "Professional advisor"}</p>
-              <p className="text-slate-500 text-sm">📍 {data.user.location || "—"}</p>
+              <p className="text-slate-500 text-sm flex items-center justify-center gap-1">
+                <MapPin size={14} className="shrink-0" />
+                {data.user.location || "—"}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

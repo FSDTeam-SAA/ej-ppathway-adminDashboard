@@ -10,6 +10,7 @@ import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Input, Textarea } from "../../../components/ui/Input";
 import { Skeleton, CardSkeleton } from "../../../components/Skeleton";
 import { ChevronLeftIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
+import { MapPin } from "lucide-react";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatCurrency, formatDate } from "../../../lib/format";
@@ -65,7 +66,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     setScheduleLoading(true);
     try {
       const datetime = `${scheduleDate}T${scheduleTime}:00`;
-      await api.post(`/admin/advisor-applications/${id}/schedule-interview`, { datetime });
+      await api.patch(`/admin/advisor-applications/${id}/schedule-interview`, { datetime });
       toast.success("Interview scheduled");
       setScheduleOpen(false);
       load();
@@ -84,7 +85,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     }
     setContractLoading(true);
     try {
-      await api.post(`/admin/advisor-applications/${id}/contract`, { contractUrl });
+      await api.patch(`/admin/advisor-applications/${id}/contract`, { contractUrl });
       toast.success("Contract sent");
       setContractOpen(false);
       load();
@@ -99,7 +100,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   const approve = async () => {
     setApproveLoading(true);
     try {
-      await api.post(`/admin/advisor-applications/${id}/approve`, {});
+      await api.patch(`/admin/advisor-applications/${id}/approve`, {});
       toast.success("Advisor approved");
       setConfirmApprove(false);
       load();
@@ -114,7 +115,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   const reject = async () => {
     setRejectLoading(true);
     try {
-      await api.post(`/admin/advisor-applications/${id}/reject`, { reason: rejectReason });
+      await api.patch(`/admin/advisor-applications/${id}/reject`, { reason: rejectReason });
       toast.success("Application rejected");
       setConfirmReject(false);
       router.push("/advisor-approvals");
@@ -172,7 +173,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-slate-900">{data.user?.name}</h2>
                     <p className="text-slate-500">{data.professionalTitle || "I am a professional advisor"}</p>
-                    <p className="text-slate-500 text-sm">📍 {data.user?.location || "—"}</p>
+                    <p className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} className="shrink-0" />{data.user?.location || "—"}</p>
                     <div className="mt-2">
                       <Badge tone="warning">Under Review</Badge>
                     </div>
