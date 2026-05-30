@@ -444,28 +444,71 @@ function FileFieldInline({
   onChange: (f: File | null) => void;
   existing?: string;
 }) {
+  // Build a preview URL: new File → object URL, else fall back to existing URL.
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) {
+      setObjectUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setObjectUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const preview = objectUrl || existing || null;
+
   return (
     <div>
       <div className="text-sm font-medium text-slate-700 mb-2">{label}</div>
-      <label className="block bg-[#e6f2f6]/60 border border-dashed border-[#cbe4eb] rounded-lg px-4 py-6 text-center cursor-pointer hover:bg-[#e6f2f6]">
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] || null)}
-        />
-        <div className="inline-flex flex-col items-center text-[#0a7a90]">
-          <UploadIcon size={24} />
-          <div className="text-sm font-medium text-slate-700 mt-1">
-            {file ? file.name : "Click to upload image"}
+      {preview ? (
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt={label}
+            className="h-20 w-20 rounded-lg object-cover border border-[#cbe4eb] shrink-0"
+          />
+          <div className="flex flex-col gap-1.5">
+            <label className="cursor-pointer inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium hover:bg-slate-50 w-fit">
+              Replace
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onChange(e.target.files?.[0] || null)}
+              />
+            </label>
+            {file && (
+              <button
+                type="button"
+                onClick={() => onChange(null)}
+                className="text-xs font-medium text-red-600 hover:underline w-fit text-left"
+              >
+                Remove selected
+              </button>
+            )}
+            <span className="text-[10px] text-slate-400 truncate max-w-50">
+              {file ? file.name : "Current image"}
+            </span>
           </div>
-          {existing && !file && (
-            <div className="text-[10px] text-slate-400 mt-1 truncate max-w-xs">
-              Current: {existing.split("/").pop()}
-            </div>
-          )}
         </div>
-      </label>
+      ) : (
+        <label className="block bg-[#e6f2f6]/60 border border-dashed border-[#cbe4eb] rounded-lg px-4 py-6 text-center cursor-pointer hover:bg-[#e6f2f6]">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => onChange(e.target.files?.[0] || null)}
+          />
+          <div className="inline-flex flex-col items-center text-[#0a7a90]">
+            <UploadIcon size={24} />
+            <div className="text-sm font-medium text-slate-700 mt-1">
+              Click to upload image
+            </div>
+          </div>
+        </label>
+      )}
     </div>
   );
 }
