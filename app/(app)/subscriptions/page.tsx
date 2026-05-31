@@ -14,7 +14,8 @@ import { useToast } from "../../lib/toast";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { formatCompact, formatCurrency } from "../../lib/format";
 import { AreaChart, DonutChart, MiniArea } from "../../components/charts";
-import type { Plan, SubscriptionStats } from "../../lib/types";
+import type { Plan, SubscriptionStats, Currency, CountryPrice } from "../../lib/types";
+import { CurrenciesModal } from "./CurrenciesModal";
 
 const monthLabels = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
@@ -22,24 +23,28 @@ export default function SubscriptionsPage() {
   const toast = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [stats, setStats] = useState<SubscriptionStats | null>(null);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Plan | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Plan | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [manageCurrencies, setManageCurrencies] = useState(false);
 
   const bulk = useBulkSelection(plans);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [p, s] = await Promise.all([
+      const [p, s, c] = await Promise.all([
         api.get<Plan[]>("/admin/subscriptions/plans"),
         api.get<SubscriptionStats>("/admin/subscriptions/stats"),
+        api.get<Currency[]>("/admin/currencies"),
       ]);
       setPlans(p.data || []);
       setStats(s.data || null);
+      setCurrencies(c.data || []);
       bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
@@ -177,9 +182,14 @@ export default function SubscriptionsPage() {
           ) : (
             <span />
           )}
-          <Button onClick={() => setCreating(true)}>
-            <PlusIcon size={16} /> Add New
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setManageCurrencies(true)}>
+              <CrownIcon size={16} /> Currencies
+            </Button>
+            <Button onClick={() => setCreating(true)}>
+              <PlusIcon size={16} /> Add New
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -215,9 +225,16 @@ export default function SubscriptionsPage() {
                   <p className="text-slate-500 text-sm mb-4">
                     {p.audienceLimit || p.description || "—"}
                   </p>
-                  <div className="text-3xl font-bold text-[#0a7a90] mb-4">
+                  <div className="text-3xl font-bold text-[#0a7a90] mb-1">
                     {formatCurrency(p.pricePerMonth)}
                     <span className="text-base text-slate-500 font-normal">/month</span>
+                  </div>
+                  <div className="text-xs text-slate-400 mb-4">
+                    {p.countryPrices && p.countryPrices.length > 0
+                      ? `${p.countryPrices.length} country price${
+                          p.countryPrices.length === 1 ? "" : "s"
+                        } set · others auto-converted`
+                      : "All countries auto-converted from USD"}
                   </div>
                   <ul className="space-y-2 mb-6 flex-1">
                     {(p.benefits || []).map((b, i) => (
@@ -254,6 +271,7 @@ export default function SubscriptionsPage() {
 
         <PlanModal
           open={creating}
+          currencies={currencies}
           onClose={() => setCreating(false)}
           onSaved={() => {
             setCreating(false);
@@ -263,11 +281,19 @@ export default function SubscriptionsPage() {
         <PlanModal
           open={!!editing}
           plan={editing}
+          currencies={currencies}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
             load();
           }}
+        />
+
+        <CurrenciesModal
+          open={manageCurrencies}
+          currencies={currencies}
+          onClose={() => setManageCurrencies(false)}
+          onChanged={load}
         />
 
         <ConfirmDialog
@@ -302,11 +328,13 @@ function PlanModal({
   onClose,
   onSaved,
   plan,
+  currencies,
 }: {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
   plan?: Plan | null;
+  currencies: Currency[];
 }) {
   const toast = useToast();
   const [name, setName] = useState("");
@@ -314,6 +342,7 @@ function PlanModal({
   const [price, setPrice] = useState("");
   const [benefits, setBenefits] = useState<string[]>([]);
   const [newBenefit, setNewBenefit] = useState("");
+  const [countryPrices, setCountryPrices] = useState<CountryPrice[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -322,14 +351,52 @@ function PlanModal({
       setAudience(plan.audienceLimit || "");
       setPrice(String(plan.pricePerMonth));
       setBenefits(plan.benefits || []);
+      setCountryPrices(plan.countryPrices || []);
     } else {
       setName("");
       setAudience("");
       setPrice("");
       setBenefits([]);
+      setCountryPrices([]);
     }
     setNewBenefit("");
   }, [plan, open]);
+
+  const curFor = (code: string) => currencies.find((c) => c.country === code);
+  const baseUsd = Number(price) || 0;
+
+  const addCountryPrice = () => {
+    // pick the first currency not already overridden (skip USD base)
+    const used = new Set(countryPrices.map((cp) => cp.country));
+    const next = currencies.find((c) => !c.isBase && !used.has(c.country));
+    if (!next) {
+      toast.error("All supported countries already have a price");
+      return;
+    }
+    setCountryPrices((arr) => [
+      ...arr,
+      {
+        country: next.country,
+        currency: next.currency,
+        // seed with the FX-converted amount as a convenient starting point
+        pricePerMonth: Math.round(baseUsd * (next.usdRate || 1)),
+      },
+    ]);
+  };
+
+  const setCountryPriceAt = (i: number, patch: Partial<CountryPrice>) => {
+    setCountryPrices((arr) =>
+      arr.map((cp, idx) => {
+        if (idx !== i) return cp;
+        const merged = { ...cp, ...patch };
+        if (patch.country) {
+          const c = curFor(patch.country);
+          if (c) merged.currency = c.currency;
+        }
+        return merged;
+      })
+    );
+  };
 
   const submit = async () => {
     if (!name) {
@@ -342,6 +409,13 @@ function PlanModal({
         name,
         audienceLimit: audience,
         pricePerMonth: Number(price) || 0,
+        countryPrices: countryPrices
+          .filter((cp) => cp.country && cp.pricePerMonth >= 0)
+          .map((cp) => ({
+            country: cp.country,
+            currency: cp.currency,
+            pricePerMonth: Number(cp.pricePerMonth) || 0,
+          })),
         benefits,
       };
       if (plan) {
@@ -379,7 +453,7 @@ function PlanModal({
         <div className="relative">
           <span className="absolute left-3 top-9 text-slate-500">$</span>
           <Input
-            label="Price / month"
+            label="Base price / month (USD)"
             type="number"
             step="0.01"
             value={price}
@@ -387,6 +461,85 @@ function PlanModal({
             className="pl-7"
           />
         </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-sm font-medium text-slate-700">
+              Per-country pricing
+            </div>
+            <button
+              type="button"
+              onClick={addCountryPrice}
+              className="text-xs font-medium text-[#0a7a90] inline-flex items-center gap-1 hover:underline"
+            >
+              <PlusIcon size={12} /> Add country
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            Set the price manually for specific countries (based on local earning
+            power). Countries without an override are auto-converted from the base
+            USD price using the configured exchange rate.
+          </p>
+          {countryPrices.length === 0 ? (
+            <p className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
+              No manual overrides — every country uses the converted USD price.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {countryPrices.map((cp, i) => {
+                const c = curFor(cp.country);
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    <select
+                      value={cp.country}
+                      onChange={(e) =>
+                        setCountryPriceAt(i, { country: e.target.value })
+                      }
+                      className="h-10 px-2 rounded-lg bg-[#e6f2f6]/60 text-sm border border-transparent focus:border-[#0a7a90] focus:bg-white min-w-36"
+                    >
+                      {currencies
+                        .filter((opt) => !opt.isBase)
+                        .map((opt) => (
+                          <option key={opt.country} value={opt.country}>
+                            {opt.countryName} ({opt.currency})
+                          </option>
+                        ))}
+                    </select>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+                        {c?.symbol || ""}
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={cp.pricePerMonth}
+                        onChange={(e) =>
+                          setCountryPriceAt(i, {
+                            pricePerMonth: Number(e.target.value),
+                          })
+                        }
+                        className="w-full h-10 pl-7 pr-3 rounded-lg bg-[#e6f2f6]/60 text-sm border border-transparent focus:border-[#0a7a90] focus:bg-white"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCountryPrices((arr) =>
+                          arr.filter((_, idx) => idx !== i)
+                        )
+                      }
+                      className="h-10 w-10 rounded-lg border border-red-200 text-red-500 inline-flex items-center justify-center hover:bg-red-50 shrink-0"
+                      aria-label="Remove"
+                    >
+                      <TrashIcon size={16} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <div>
           <div className="text-sm font-medium text-slate-700 mb-2">Benefits</div>
           <div className="space-y-2 mb-3">
