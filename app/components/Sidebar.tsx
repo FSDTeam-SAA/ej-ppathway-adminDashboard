@@ -20,6 +20,7 @@ import {
   ShieldIcon,
   SubAdminIcon,
   UsersIcon,
+  VideoIcon,
 } from "./Icons";
 
 type Item = {
@@ -36,6 +37,7 @@ const ITEMS: Item[] = [
   { label: "Advisor Approvals", href: "/advisor-approvals", icon: ApproveIcon, permission: "advisors.approve" },
   { label: "Advisor Management", href: "/advisors", icon: AdvisorIcon, permission: "advisors.manage" },
   { label: "Session Management", href: "/sessions", icon: SessionIcon, permission: "sessions.manage" },
+  { label: "Session Recordings", href: "/recordings", icon: VideoIcon, permission: "sessions.manage" },
   { label: "Compliance & Safety", href: "/compliance", icon: ShieldIcon, permission: "compliance.manage" },
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
   { label: "Subscription Plans", href: "/subscriptions", icon: CrownIcon, permission: "subscriptions.manage" },

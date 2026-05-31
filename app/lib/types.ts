@@ -143,6 +143,9 @@ export interface SessionItem {
     | "disputed"
     | "flagged";
   duration?: number;
+  actualDurationSec?: number;
+  startedAt?: string;
+  endedAt?: string;
   chargedAmount?: number;
   refundIssued?: number;
   cancelReason?: string;
