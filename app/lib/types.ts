@@ -213,13 +213,34 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface CountryPrice {
+  country: string;       // ISO-3166 alpha-2
+  currency?: string;     // optional; defaults to the country's currency
+  pricePerMonth: number; // price in local currency units
+}
+
 export interface Plan {
   _id: string;
   name: string;
   description?: string;
   audienceLimit?: string;
-  pricePerMonth: number;
+  pricePerMonth: number; // base USD price
+  countryPrices?: CountryPrice[];
   benefits: string[];
+  isActive: boolean;
+  sortOrder?: number;
+}
+
+export interface Currency {
+  _id: string;
+  country: string;       // ISO-3166 alpha-2
+  countryName: string;
+  currency: string;      // ISO-4217
+  symbol: string;
+  usdRate: number;       // units of `currency` per 1 USD
+  roundTo: number;
+  zeroDecimal?: boolean;
+  isBase?: boolean;
   isActive: boolean;
   sortOrder?: number;
 }
