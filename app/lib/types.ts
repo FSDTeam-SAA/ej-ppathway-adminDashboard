@@ -13,6 +13,10 @@ export interface AdminUser {
   role: Role;
   status: UserStatus;
   profilePhoto?: string;
+  country?: string;
+  city?: string;
+  currency?: string;
+  /** Legacy free-text label; still used as the sub-admin role label. */
   location?: string;
   permissions?: string[];
   isVerified?: boolean;
@@ -61,9 +65,9 @@ export interface UserDetailsResponse {
 }
 
 export interface AdvisorPricing {
-  chat?: number;
-  call?: number;
-  video?: number;
+  chatPerMin?: number;
+  callPerMin?: number;
+  videoPerMin?: number;
 }
 
 export interface AdvisorProfile {

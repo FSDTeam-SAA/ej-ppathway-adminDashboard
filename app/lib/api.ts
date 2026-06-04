@@ -1,7 +1,6 @@
 "use client";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export const ACCESS_TOKEN_KEY = "ej_admin_access_token";
 export const REFRESH_TOKEN_KEY = "ej_admin_refresh_token";
@@ -37,7 +36,7 @@ export const getAccessToken = (): string | null => {
 export const setAuth = (
   accessToken: string,
   refreshToken: string,
-  user: unknown
+  user: unknown,
 ) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
@@ -73,7 +72,7 @@ type RequestOptions = {
 };
 
 const buildQuery = (
-  query?: Record<string, string | number | boolean | undefined | null>
+  query?: Record<string, string | number | boolean | undefined | null>,
 ) => {
   if (!query) return "";
   const params = new URLSearchParams();
@@ -87,7 +86,7 @@ const buildQuery = (
 
 export async function apiRequest<T = unknown>(
   path: string,
-  opts: RequestOptions = {}
+  opts: RequestOptions = {},
 ): Promise<ApiEnvelope<T>> {
   const {
     method = "GET",
@@ -124,14 +123,21 @@ export async function apiRequest<T = unknown>(
   try {
     json = (await res.json()) as ApiEnvelope<T>;
   } catch {
-    throw new ApiError(`Invalid JSON response (${res.status})`, res.status, null);
+    throw new ApiError(
+      `Invalid JSON response (${res.status})`,
+      res.status,
+      null,
+    );
   }
 
   if (!res.ok || json.success === false) {
     const msg = json?.message || `Request failed (${res.status})`;
     if (res.status === 401) {
       clearAuth();
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
         window.location.href = "/login";
       }
     }
@@ -143,12 +149,21 @@ export async function apiRequest<T = unknown>(
 export const api = {
   get: <T = unknown>(path: string, query?: RequestOptions["query"]) =>
     apiRequest<T>(path, { method: "GET", query }),
-  post: <T = unknown>(path: string, body?: unknown, opts: Partial<RequestOptions> = {}) =>
-    apiRequest<T>(path, { method: "POST", body, ...opts }),
-  put: <T = unknown>(path: string, body?: unknown, opts: Partial<RequestOptions> = {}) =>
-    apiRequest<T>(path, { method: "PUT", body, ...opts }),
-  patch: <T = unknown>(path: string, body?: unknown, opts: Partial<RequestOptions> = {}) =>
-    apiRequest<T>(path, { method: "PATCH", body, ...opts }),
+  post: <T = unknown>(
+    path: string,
+    body?: unknown,
+    opts: Partial<RequestOptions> = {},
+  ) => apiRequest<T>(path, { method: "POST", body, ...opts }),
+  put: <T = unknown>(
+    path: string,
+    body?: unknown,
+    opts: Partial<RequestOptions> = {},
+  ) => apiRequest<T>(path, { method: "PUT", body, ...opts }),
+  patch: <T = unknown>(
+    path: string,
+    body?: unknown,
+    opts: Partial<RequestOptions> = {},
+  ) => apiRequest<T>(path, { method: "PATCH", body, ...opts }),
   delete: <T = unknown>(path: string, opts: Partial<RequestOptions> = {}) =>
     apiRequest<T>(path, { method: "DELETE", ...opts }),
 };

@@ -11,13 +11,15 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Input, Textarea } from "../../components/ui/Input";
+import { Combobox } from "../../components/ui/Combobox";
 import { Button } from "../../components/ui/Button";
 import { EyeIcon, PlusIcon, StarIcon, SuspendIcon } from "../../components/Icons";
 import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
-import { formatCurrency } from "../../lib/format";
+import { useCountries, useCities } from "../../lib/countries";
+import { useCurrencyCatalog, symbolFor } from "../../lib/currency";
 import type { AdvisorListItem } from "../../lib/types";
 
 const TABS = [
@@ -28,6 +30,7 @@ const TABS = [
 
 export default function AdvisorsPage() {
   const toast = useToast();
+  useCurrencyCatalog();
   const [items, setItems] = useState<AdvisorListItem[]>([]);
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(1);
@@ -165,7 +168,7 @@ export default function AdvisorsPage() {
                   ) : (
                     items.map((it) => {
                       const rating = it.profile?.avgRating;
-                      const price = it.profile?.pricing?.video || it.profile?.pricing?.call || it.profile?.pricing?.chat;
+                      const price = it.profile?.pricing?.videoPerMin || it.profile?.pricing?.callPerMin || it.profile?.pricing?.chatPerMin;
                       const sessions = it.profile?.totalSessions || 0;
                       const tier = it.profile?.tier || "bronze";
                       const selected = bulk.isSelected(it.user._id);
@@ -196,7 +199,7 @@ export default function AdvisorsPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-slate-700">
-                            {price ? `${formatCurrency(price)}/min` : "—"}
+                            {price ? `${symbolFor(it.user?.currency)}${price}/min` : "—"}
                           </td>
                           <td className="px-5 py-3 text-slate-700">{sessions}</td>
                           <td className="px-5 py-3">
@@ -322,7 +325,8 @@ function AddAdvisorModal({
     name: "",
     email: "",
     phoneNumber: "",
-    location: "",
+    country: "",
+    city: "",
     language: "",
     password: "",
     experience: "",
@@ -330,6 +334,8 @@ function AddAdvisorModal({
     style: "",
     bio: "",
   });
+  const countries = useCountries();
+  const cities = useCities(form.country);
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
 
@@ -356,7 +362,7 @@ function AddAdvisorModal({
 
   const handleClose = () => {
     setCreated(null);
-    setForm({ name: "", email: "", phoneNumber: "", location: "", language: "", password: "", experience: "", type: "", style: "", bio: "" });
+    setForm({ name: "", email: "", phoneNumber: "", country: "", city: "", language: "", password: "", experience: "", type: "", style: "", bio: "" });
     onClose();
   };
 
@@ -402,12 +408,34 @@ function AddAdvisorModal({
           onChange={(e) => onChange("name", e.target.value)}
           placeholder="Type your name..."
         />
-        <Input
-          label="Enter Location"
-          value={form.location}
-          onChange={(e) => onChange("location", e.target.value)}
-          placeholder="Type your location..."
-        />
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">
+            Choose Country
+          </span>
+          <Combobox
+            options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
+            value={form.country}
+            onChange={(v) => setForm((s) => ({ ...s, country: v, city: "" }))}
+            placeholder="Select country…"
+            searchPlaceholder="Search countries…"
+            emptyText="No country found."
+          />
+        </label>
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">
+            Choose City
+          </span>
+          <Combobox
+            options={cities.map((c) => ({ value: c, label: c }))}
+            value={form.city}
+            onChange={(v) => onChange("city", v)}
+            placeholder={form.country ? "Select city…" : "Select a country first"}
+            searchPlaceholder="Search cities…"
+            emptyText="No city found."
+            disabled={!form.country}
+            allowCustom
+          />
+        </label>
         <Input
           label="Choose Language"
           value={form.language}

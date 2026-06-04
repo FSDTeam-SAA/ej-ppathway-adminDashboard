@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { PlusIcon, TrashIcon } from "../../components/Icons";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { useCurrencyCatalog, symbolFor } from "../../lib/currency";
 import type { Currency } from "../../lib/types";
 
 type Draft = {
@@ -48,12 +49,33 @@ export function CurrenciesModal({
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [deleteRow, setDeleteRow] = useState<Currency | null>(null);
+  const [countryList, setCountryList] = useState<
+    { name: string; iso2: string; currency: string }[]
+  >([]);
+  useCurrencyCatalog(); // preload symbol catalog
 
   useEffect(() => {
     setRows(currencies);
     setAdding(false);
     setDraft(emptyDraft);
   }, [currencies, open]);
+
+  // Load the country → currency catalog once, to drive the "Add Country" picker.
+  useEffect(() => {
+    if (!open || countryList.length) return;
+    let active = true;
+    api
+      .get<{ name: string; iso2: string; currency: string }[]>(
+        "/locations/countries",
+      )
+      .then((res) => {
+        if (active) setCountryList(res.data ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [open, countryList.length]);
 
   const patchRow = (id: string, patch: Partial<Currency>) =>
     setRows((arr) => arr.map((r) => (r._id === id ? { ...r, ...patch } : r)));
@@ -225,29 +247,31 @@ export function CurrenciesModal({
 
             {adding && (
               <tr className="border-b border-slate-50 bg-[#e6f2f6]/30">
-                <td className="py-2 pr-2">
-                  <input
-                    className={`${cell} w-16`}
-                    placeholder="NG"
-                    maxLength={2}
+                <td className="py-2 pr-2" colSpan={2}>
+                  <select
+                    className={cell}
                     value={draft.country}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const iso2 = e.target.value;
+                      const match = countryList.find((c) => c.iso2 === iso2);
                       setDraft((d) => ({
                         ...d,
-                        country: e.target.value.toUpperCase(),
-                      }))
-                    }
-                  />
-                </td>
-                <td className="py-2 px-2">
-                  <input
-                    className={cell}
-                    placeholder="Nigeria"
-                    value={draft.countryName}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, countryName: e.target.value }))
-                    }
-                  />
+                        country: iso2,
+                        countryName: match?.name ?? "",
+                        currency: match?.currency ?? d.currency,
+                        symbol: match?.currency
+                          ? symbolFor(match.currency)
+                          : d.symbol,
+                      }));
+                    }}
+                  >
+                    <option value="">Select country…</option>
+                    {countryList.map((c) => (
+                      <option key={c.iso2} value={c.iso2}>
+                        {c.name} ({c.iso2})
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="py-2 px-2">
                   <input

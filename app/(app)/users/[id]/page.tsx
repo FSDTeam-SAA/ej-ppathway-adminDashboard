@@ -13,6 +13,8 @@ import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
 import { DetailSkeleton } from "../../../components/Skeleton";
 import { formatCurrency, formatDate } from "../../../lib/format";
+import { useCountryName } from "../../../lib/countries";
+import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
 import type { UserDetailsResponse } from "../../../lib/types";
 import { DollarIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
 
@@ -20,6 +22,8 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const router = useRouter();
   const toast = useToast();
+  const countryName = useCountryName();
+  useCurrencyCatalog();
   const [data, setData] = useState<UserDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [creditsOpen, setCreditsOpen] = useState(false);
@@ -155,7 +159,16 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                 <Field label="Name" value={data.user.name} />
                 <Field label="Email" value={data.user.email} />
                 <Field label="Phone" value={data.user.phone || "—"} />
-                <Field label="Location" value={data.user.location || "—"} />
+                <Field label="Country" value={countryName(data.user.country) || "—"} />
+                <Field label="City" value={data.user.city || "—"} />
+                <Field
+                  label="Currency"
+                  value={
+                    data.user.currency
+                      ? `${symbolFor(data.user.currency)} ${data.user.currency}`
+                      : "—"
+                  }
+                />
                 <Field label="Joined" value={formatDate(data.user.createdAt)} />
                 <Field label="Total Spent" value={formatCurrency(data.totalSpent)} />
                 <Field label="Total Sessions" value={`${data.sessionsCount ?? 0}`} />

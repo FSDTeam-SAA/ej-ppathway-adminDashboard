@@ -13,11 +13,15 @@ import { ChevronLeftIcon, CallIcon, ChatIcon, VideoIcon } from "../../../compone
 import { MapPin } from "lucide-react";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
-import { formatCurrency, formatDate } from "../../../lib/format";
+import { formatDate } from "../../../lib/format";
+import { useCountryName, formatLocation } from "../../../lib/countries";
+import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
 import type { AdvisorApplication } from "../../../lib/types";
 
 export default function ApplicationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const countryName = useCountryName();
+  useCurrencyCatalog();
   const router = useRouter();
   const toast = useToast();
 
@@ -173,7 +177,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-slate-900">{data.user?.name}</h2>
                     <p className="text-slate-500">{data.professionalTitle || "I am a professional advisor"}</p>
-                    <p className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} className="shrink-0" />{data.user?.location || "—"}</p>
+                    <p className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} className="shrink-0" />{formatLocation(data.user?.city, countryName(data.user?.country)) || "—"}</p>
                     <div className="mt-2">
                       <Badge tone="warning">Under Review</Badge>
                     </div>
@@ -241,9 +245,9 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   <span>💲</span> Pricing
                 </h3>
                 <div className="space-y-3">
-                  <PricingRow icon={<ChatIcon />} label="Chat" value={data.pricing?.chat} />
-                  <PricingRow icon={<CallIcon />} label="Call" value={data.pricing?.call} />
-                  <PricingRow icon={<VideoIcon />} label="Video" value={data.pricing?.video} />
+                  <PricingRow icon={<ChatIcon />} label="Chat" value={data.pricing?.chatPerMin} symbol={symbolFor(data.user?.currency)} />
+                  <PricingRow icon={<CallIcon />} label="Call" value={data.pricing?.callPerMin} symbol={symbolFor(data.user?.currency)} />
+                  <PricingRow icon={<VideoIcon />} label="Video" value={data.pricing?.videoPerMin} symbol={symbolFor(data.user?.currency)} />
                 </div>
               </div>
 
@@ -420,10 +424,12 @@ function PricingRow({
   icon,
   label,
   value,
+  symbol = "$",
 }: {
   icon: React.ReactNode;
   label: string;
   value?: number;
+  symbol?: string;
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -432,7 +438,9 @@ function PricingRow({
         {label}
       </span>
       <span className="font-semibold text-slate-900">
-        {value !== undefined ? `${formatCurrency(value)}/hr` : "—"}
+        {value !== undefined && value !== null
+          ? `${symbol}${value}/min`
+          : "—"}
       </span>
     </div>
   );
