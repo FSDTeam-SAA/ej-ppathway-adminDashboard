@@ -15,6 +15,8 @@ import { formatCurrency } from "../../../lib/format";
 import type { AdvisorProfile, AdminUser, Wallet } from "../../../lib/types";
 import { StarIcon } from "../../../components/Icons";
 import { MapPin } from "lucide-react";
+import { useCountryName, formatLocation } from "../../../lib/countries";
+import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
 
 type AdvisorDetailsResponse = {
   user: AdminUser;
@@ -27,6 +29,8 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const router = useRouter();
   const toast = useToast();
+  const countryName = useCountryName();
+  useCurrencyCatalog();
   const [data, setData] = useState<AdvisorDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
@@ -98,7 +102,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               <p className="text-slate-500">{data.profile?.professionalTitle || "Professional advisor"}</p>
               <p className="text-slate-500 text-sm flex items-center justify-center gap-1">
                 <MapPin size={14} className="shrink-0" />
-                {data.user.location || "—"}
+                {formatLocation(data.user.city, countryName(data.user.country)) || "—"}
               </p>
             </div>
 
@@ -111,11 +115,12 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               } />
               <Stat
                 label="Rate per minute"
-                value={formatCurrency(
-                  data.profile?.pricing?.video ||
-                  data.profile?.pricing?.call ||
-                  data.profile?.pricing?.chat
-                )}
+                value={`${symbolFor(data.user?.currency)}${
+                  data.profile?.pricing?.videoPerMin ||
+                  data.profile?.pricing?.callPerMin ||
+                  data.profile?.pricing?.chatPerMin ||
+                  0
+                }`}
               />
               <Stat label="Tier Rank" value={
                 <span className="capitalize">{data.profile?.tier || "bronze"}</span>
