@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
@@ -10,6 +10,7 @@ import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatRelative } from "../../lib/format";
 import { useAuth } from "../../lib/auth-context";
+import { getSocket } from "../../lib/socket";
 import type { ChatItem } from "../../lib/types";
 
 export default function ChatsPage() {
@@ -18,36 +19,63 @@ export default function ChatsPage() {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  // Keep the latest query in a ref so realtime/poll refetches use it without
+  // re-subscribing the socket every keystroke.
+  const qRef = useRef(q);
+  qRef.current = q;
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
-      const r = await api.get<ChatItem[]>("/chats/admin", { q: q || undefined });
+      const r = await api.get<ChatItem[]>("/chats/admin", {
+        q: qRef.current || undefined,
+      });
       setItems(r.data || []);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
-      toast.error(msg);
+      if (showSpinner) toast.error(msg);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
-  };
+  }, [toast]);
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  // Realtime: refresh list ordering/unread badges when any conversation gets a
+  // new message. Falls back to polling every 4s if the socket can't connect.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) {
+      const t = setInterval(() => load(false), 4000);
+      return () => clearInterval(t);
+    }
+    const refresh = () => load(false);
+    socket.on("chat:updated", refresh);
+    socket.on("chat:new_message", refresh);
+    // Safety-net poll in case the socket silently drops.
+    const t = setInterval(() => load(false), 4000);
+    return () => {
+      socket.off("chat:updated", refresh);
+      socket.off("chat:new_message", refresh);
+      clearInterval(t);
+    };
+  }, [load]);
+
   return (
     <>
       <Topbar
-        searchPlaceholder="Search Chats by name ..."
+        searchPlaceholder="Search support chats by name ..."
         onSearch={(v) => setQ(v)}
       />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
-          title="Chats"
+          title="Support Chat"
           breadcrumb={[
             { label: "Dashboard", href: "/" },
-            { label: "Chats" },
+            { label: "Support Chat" },
           ]}
         />
 

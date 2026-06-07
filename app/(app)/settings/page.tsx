@@ -11,8 +11,16 @@ import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { useAuth } from "../../lib/auth-context";
 
+type SettingsTab = "profile" | "password" | "credits";
+
 export default function SettingsPage() {
-  const [tab, setTab] = useState<"profile" | "password">("profile");
+  const [tab, setTab] = useState<SettingsTab>("profile");
+  const tabClass = (key: SettingsTab) =>
+    `h-12 rounded-lg font-medium border ${
+      tab === key
+        ? "bg-[#0a7a90] text-white border-[#0a7a90]"
+        : "bg-white border-slate-200 text-slate-600"
+    }`;
   return (
     <>
       <Topbar />
@@ -25,32 +33,37 @@ export default function SettingsPage() {
           ]}
         />
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <button
             type="button"
             onClick={() => setTab("profile")}
-            className={`h-12 rounded-lg font-medium border ${
-              tab === "profile"
-                ? "border-[#0a7a90] text-[#0a7a90] bg-white"
-                : "bg-white border-slate-200 text-slate-600"
-            }`}
+            className={tabClass("profile")}
           >
             Personal Information
           </button>
           <button
             type="button"
             onClick={() => setTab("password")}
-            className={`h-12 rounded-lg font-medium ${
-              tab === "password"
-                ? "bg-[#0a7a90] text-white"
-                : "bg-white border border-slate-200 text-slate-600"
-            }`}
+            className={tabClass("password")}
           >
             Change Password
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("credits")}
+            className={tabClass("credits")}
+          >
+            Customer Credits
+          </button>
         </div>
 
-        {tab === "profile" ? <ProfileForm /> : <PasswordForm />}
+        {tab === "profile" ? (
+          <ProfileForm />
+        ) : tab === "password" ? (
+          <PasswordForm />
+        ) : (
+          <SignupCreditsForm />
+        )}
       </main>
     </>
   );
@@ -226,6 +239,92 @@ function PasswordForm() {
       </div>
       <div className="mt-6 flex justify-end">
         <Button onClick={submit} loading={saving}>
+          Save Changes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SignupCreditsForm() {
+  const toast = useToast();
+  const [value, setValue] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const r = await api.get<{ signupFreeCredits: number }>(
+          "/admin/settings/signup-credits",
+        );
+        if (active) setValue(String(r.data?.signupFreeCredits ?? 0));
+      } catch (err) {
+        if (active) {
+          const msg = err instanceof ApiError ? err.message : "Failed to load";
+          toast.error(msg);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const save = async () => {
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error("Enter a valid non-negative number");
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await api.patch<{ signupFreeCredits: number }>(
+        "/admin/settings/signup-credits",
+        { signupFreeCredits: amount },
+      );
+      if (typeof r.data?.signupFreeCredits === "number") {
+        setValue(String(r.data.signupFreeCredits));
+      }
+      toast.success("Signup credits updated");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <h3 className="text-lg font-semibold text-slate-900 mb-1">
+        Customer Credits
+      </h3>
+      <p className="text-sm text-slate-500 mb-4">
+        Configure how many free minutes/credits are automatically granted to
+        each new customer when they sign up.
+      </p>
+      <div className="max-w-sm">
+        {loading ? (
+          <div className="h-11 rounded-lg bg-[#e6f2f6]/60 animate-pulse" />
+        ) : (
+          <Input
+            label="Free minutes/credits granted to each new customer on signup"
+            type="number"
+            min={0}
+            step={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="0"
+          />
+        )}
+      </div>
+      <div className="mt-6 flex justify-end">
+        <Button onClick={save} loading={saving} disabled={loading}>
           Save Changes
         </Button>
       </div>

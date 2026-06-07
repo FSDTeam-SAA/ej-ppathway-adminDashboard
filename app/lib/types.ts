@@ -287,6 +287,29 @@ export interface ShowcaseReview {
   showcaseLocation?: string;
   showcasePhoto?: string;
   isAdminShowcase: boolean;
+  isFeaturedTestimonial?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface UserReview {
+  _id: string;
+  rating: number;
+  comment?: string;
+  sessionType?: string;
+  createdAt: string;
+  user?: { _id?: string; name?: string; profilePhoto?: string; email?: string };
+  advisor?: { _id?: string; name?: string; profilePhoto?: string };
+}
+
+export interface Notification {
+  _id: string;
+  type: string;
+  title: string;
+  body?: string;
+  data?: Record<string, unknown>;
+  read: boolean;
+  readAt?: string;
   createdAt: string;
 }
 

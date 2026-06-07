@@ -18,6 +18,7 @@ import {
   SessionIcon,
   SettingIcon,
   ShieldIcon,
+  StarIcon,
   SubAdminIcon,
   UsersIcon,
   VideoIcon,
@@ -42,9 +43,10 @@ const ITEMS: Item[] = [
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
   { label: "Subscription Plans", href: "/subscriptions", icon: CrownIcon, permission: "subscriptions.manage" },
   { label: "Content (CMS)", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
-  { label: "Chats", href: "/chats", icon: ChatIcon, permission: "chats.manage" },
+  { label: "Support Chat", href: "/chats", icon: ChatIcon, permission: "chats.manage" },
   { label: "Sub Admins", href: "/sub-admins", icon: SubAdminIcon, permission: "sub_admins.manage" },
-  { label: "FAQ & Review Management", href: "/faq-reviews", icon: FaqIcon, permission: "faq.manage" },
+  { label: "Review Management", href: "/faq-reviews", icon: FaqIcon, permission: "faq.manage" },
+  { label: "Testimonials", href: "/testimonials", icon: StarIcon, permission: "faq.manage" },
   { label: "Setting", href: "/settings", icon: SettingIcon },
 ];
 

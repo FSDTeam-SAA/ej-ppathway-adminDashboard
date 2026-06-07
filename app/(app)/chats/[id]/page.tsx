@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, use } from "react";
+import { useCallback, useEffect, useRef, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "../../../components/Topbar";
 import { Avatar } from "../../../components/ui/Avatar";
@@ -8,6 +8,7 @@ import { Skeleton } from "../../../components/Skeleton";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { useAuth } from "../../../lib/auth-context";
+import { getSocket } from "../../../lib/socket";
 import { ChevronLeftIcon, PaperclipIcon, SendIcon } from "../../../components/Icons";
 import type { ChatItem, ChatMessage } from "../../../lib/types";
 
@@ -25,7 +26,15 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
   const [files, setFiles] = useState<File[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const load = async () => {
+  // Append a message, de-duplicating by _id so a REST-posted message and its
+  // socket echo don't both show up.
+  const appendMessage = useCallback((msg: ChatMessage) => {
+    setMessages((prev) =>
+      prev.some((m) => m._id === msg._id) ? prev : [...prev, msg],
+    );
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [c, m] = await Promise.all([
@@ -42,11 +51,49 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, toast]);
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Realtime: join this chat room and append incoming messages. Falls back to
+  // polling the message list every 4s when the socket can't connect.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) {
+      const t = setInterval(async () => {
+        try {
+          const m = await api.get<ChatMessage[]>(`/chats/${id}/messages`, {
+            limit: 50,
+          });
+          setMessages(m.data || []);
+        } catch {
+          /* ignore poll errors */
+        }
+      }, 4000);
+      return () => clearInterval(t);
+    }
+
+    const join = () => socket.emit("chat:join", { chatId: id });
+    join();
+    socket.on("connect", join);
+
+    const onNew = (payload: { chatId: string; message: ChatMessage }) => {
+      if (payload?.chatId !== id || !payload.message) return;
+      appendMessage(payload.message);
+      // Keep this conversation marked read while it's open.
+      api.post(`/chats/${id}/read`, {}).catch(() => {});
+    };
+    socket.on("chat:new_message", onNew);
+
+    return () => {
+      socket.emit("chat:leave", { chatId: id });
+      socket.off("connect", join);
+      socket.off("chat:new_message", onNew);
+    };
+  }, [id, appendMessage]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,7 +110,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
       const r = await api.post<ChatMessage>(`/chats/${id}/messages`, fd, {
         isFormData: true,
       });
-      if (r.data) setMessages((m) => [...m, r.data!]);
+      if (r.data) appendMessage(r.data);
       setText("");
       setFiles([]);
     } catch (err) {
