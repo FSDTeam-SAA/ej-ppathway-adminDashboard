@@ -65,6 +65,7 @@ export function StatusBadge({ status }: { status?: string | null }) {
     interview_pending: { tone: "warning", label: "Interview Pending" },
     scheduled: { tone: "info", label: "Scheduled" },
     awaiting_signature: { tone: "warning", label: "Awaiting Signature" },
+    awaiting_approval: { tone: "warning", label: "Awaiting Approval" },
     approved: { tone: "success", label: "Approved" },
     requested: { tone: "warning", label: "Requested" },
     paid: { tone: "success", label: "Paid" },

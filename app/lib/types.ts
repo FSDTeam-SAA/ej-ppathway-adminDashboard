@@ -112,6 +112,7 @@ export interface AdvisorApplication {
     | "interview_pending"
     | "scheduled"
     | "awaiting_signature"
+    | "awaiting_approval"
     | "approved"
     | "rejected";
   professionalTitle?: string;
@@ -128,7 +129,15 @@ export interface AdvisorApplication {
     roomName?: string;
     notes?: string;
   };
-  contract?: { sentAt?: string; url?: string; signedAt?: string };
+  contract?: {
+    sentAt?: string;
+    signedAt?: string;
+    url?: string;
+    signerName?: string;
+    signerIp?: string;
+    signatureImageUrl?: string;
+    signedPdfUrl?: string;
+  };
   rejectionReason?: string;
   createdAt: string;
 }

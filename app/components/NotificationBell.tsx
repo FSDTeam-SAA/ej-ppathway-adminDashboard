@@ -105,8 +105,11 @@ export function NotificationBell() {
   const openNotification = (n: Notification) => {
     markRead(n);
     setOpen(false);
-    const chatId = (n.data as { chatId?: string } | undefined)?.chatId;
+    const data = n.data as Record<string, unknown> | undefined;
+    const chatId = typeof data?.chatId === "string" ? data.chatId : undefined;
+    const applicationId = typeof data?.applicationId === "string" ? data.applicationId : undefined;
     if (chatId) router.push(`/chats/${chatId}`);
+    else if (applicationId) router.push(`/advisor-approvals/${applicationId}`);
     else if (n.type === "new_message") router.push("/chats");
   };
 

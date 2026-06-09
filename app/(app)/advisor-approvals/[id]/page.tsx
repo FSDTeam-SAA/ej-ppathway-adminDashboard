@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "../../../components/Topbar";
 import { Avatar } from "../../../components/ui/Avatar";
-import { Badge } from "../../../components/ui/Badge";
+import { Badge, StatusBadge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Input, Textarea } from "../../../components/ui/Input";
@@ -35,7 +35,14 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
 
   const [contractOpen, setContractOpen] = useState(false);
   const [contractUrl, setContractUrl] = useState("");
+  const [contractFile, setContractFile] = useState<File | null>(null);
   const [contractLoading, setContractLoading] = useState(false);
+
+  const closeContract = () => {
+    setContractOpen(false);
+    setContractFile(null);
+    setContractUrl("");
+  };
 
   const [confirmReject, setConfirmReject] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -83,15 +90,27 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   };
 
   const submitContract = async () => {
-    if (!contractUrl) {
-      toast.error("Enter a contract URL");
+    const url = contractUrl.trim();
+    if (!contractFile && !url) {
+      toast.error("Upload a contract PDF or enter a contract URL");
       return;
     }
     setContractLoading(true);
     try {
-      await api.patch(`/admin/advisor-applications/${id}/contract`, { contractUrl });
+      if (contractFile) {
+        const fd = new FormData();
+        fd.append("contract", contractFile);
+        if (url) fd.append("contractUrl", url);
+        await api.patch(`/admin/advisor-applications/${id}/contract`, fd, {
+          isFormData: true,
+        });
+      } else {
+        await api.patch(`/admin/advisor-applications/${id}/contract`, {
+          contractUrl: url,
+        });
+      }
       toast.success("Contract sent");
-      setContractOpen(false);
+      closeContract();
       load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
@@ -284,6 +303,79 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   </Button>
                 </div>
               </div>
+
+              {data.contract ? (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-slate-900">Contract</h3>
+                    {data.status === "awaiting_approval" ? (
+                      <StatusBadge status={data.status} />
+                    ) : null}
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    {data.contract.sentAt ? (
+                      <div className="text-slate-600">
+                        Contract sent on{" "}
+                        <span className="font-medium text-slate-900">
+                          {formatDate(data.contract.sentAt, true)}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {data.contract.signedAt ? (
+                      <div className="text-slate-600">
+                        Signed on{" "}
+                        <span className="font-medium text-slate-900">
+                          {formatDate(data.contract.signedAt, true)}
+                        </span>
+                        {data.contract.signerName ? (
+                          <>
+                            {" "}by{" "}
+                            <span className="font-medium text-slate-900">
+                              {data.contract.signerName}
+                            </span>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {data.contract.signatureImageUrl ? (
+                      <div>
+                        <div className="text-xs text-slate-500 mb-1.5">Signature</div>
+                        <img
+                          src={data.contract.signatureImageUrl}
+                          alt="Applicant signature"
+                          className="max-h-24 rounded-lg border border-slate-100 bg-white p-2"
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {data.contract.signedPdfUrl ? (
+                        <a
+                          href={data.contract.signedPdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                        >
+                          <Button size="sm">Download signed copy</Button>
+                        </a>
+                      ) : null}
+                      {data.contract.url ? (
+                        <a
+                          href={data.contract.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button size="sm" variant="outline">
+                            View original contract
+                          </Button>
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
@@ -326,18 +418,43 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
       {/* Contract Modal */}
       <Modal
         open={contractOpen}
-        onClose={() => setContractOpen(false)}
+        onClose={closeContract}
         title="Send Contract"
         size="md"
       >
+        <p className="text-sm text-slate-500 mb-4">
+          Upload a contract PDF to send to the applicant. You may optionally
+          provide a URL instead of (or in addition to) the file.
+        </p>
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">
+            Contract PDF
+          </span>
+          <input
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(e) => setContractFile(e.target.files?.[0] ?? null)}
+            className="w-full rounded-lg bg-[#e6f2f6]/60 text-sm text-slate-700 border border-transparent focus:border-[#0a7a90] focus:bg-white transition-colors file:mr-3 file:border-0 file:bg-[#0a7a90] file:text-white file:px-4 file:py-2.5 file:text-sm file:font-medium file:cursor-pointer hover:file:bg-[#076377]"
+          />
+          {contractFile ? (
+            <span className="block mt-1 text-xs text-slate-500">
+              Selected: {contractFile.name}
+            </span>
+          ) : null}
+        </label>
+        <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-px flex-1 bg-slate-200" />
+          OR
+          <span className="h-px flex-1 bg-slate-200" />
+        </div>
         <Input
-          label="Contract URL"
+          label="Contract URL (optional)"
           value={contractUrl}
           onChange={(e) => setContractUrl(e.target.value)}
           placeholder="https://docs.example.com/contract.pdf"
         />
         <div className="grid grid-cols-2 gap-3 mt-5">
-          <Button variant="outline" onClick={() => setContractOpen(false)}>
+          <Button variant="outline" onClick={closeContract}>
             Cancel
           </Button>
           <Button onClick={submitContract} loading={contractLoading}>
