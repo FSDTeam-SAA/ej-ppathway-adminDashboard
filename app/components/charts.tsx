@@ -45,7 +45,10 @@ export function BarChartSimple({
             ))}
           </div>
         ) : null}
-        <div className="relative grid grid-cols-7 gap-2 sm:gap-3 h-full items-end pt-3 pb-6">
+        <div
+          className="relative grid gap-2 sm:gap-3 h-full items-end pt-3 pb-6"
+          style={{ gridTemplateColumns: `repeat(${Math.max(1, data.length)}, minmax(0, 1fr))` }}
+        >
           {data.map((d, i) => {
             const pct = (d.value / max) * 100;
             const h = `${Math.max(6, pct)}%`;

@@ -7,17 +7,22 @@ import { CardSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input, Textarea } from "../../components/ui/Input";
-import { CrownIcon, EditIcon, PlusIcon, TrashIcon, UsersIcon } from "../../components/Icons";
+import { Pagination } from "../../components/ui/Pagination";
+import { StatusBadge } from "../../components/ui/Badge";
+import { TableSkeleton } from "../../components/Skeleton";
+import { CrownIcon, EditIcon, PlusIcon, TrashIcon, UsersIcon, DollarIcon, ClockIcon } from "../../components/Icons";
 import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
-import { formatCompact, formatCurrency } from "../../lib/format";
+import { formatCompact, formatCurrency, formatDate } from "../../lib/format";
 import { AreaChart, DonutChart, MiniArea } from "../../components/charts";
-import type { Plan, SubscriptionStats, Currency, CountryPrice } from "../../lib/types";
+import type { Plan, SubscriptionStats, Currency, CountryPrice, Transaction } from "../../lib/types";
 import { CurrenciesModal } from "./CurrenciesModal";
 
 const monthLabels = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+type RevenuePeriod = "today" | "week" | "month" | "year";
 
 export default function SubscriptionsPage() {
   const toast = useToast();
@@ -31,6 +36,7 @@ export default function SubscriptionsPage() {
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [manageCurrencies, setManageCurrencies] = useState(false);
+  const [revPeriod, setRevPeriod] = useState<RevenuePeriod>("month");
 
   const bulk = useBulkSelection(plans);
 
@@ -97,13 +103,18 @@ export default function SubscriptionsPage() {
     color: ["#fbbf24", "#60a5fa", "#0a7a90"][i % 3],
   })) || [];
 
-  const revenueArea = (() => {
-    const map = new Map<string, number>();
-    (stats?.revenueByMonth || []).forEach((r) => {
-      map.set(monthLabels[(r._id.m - 1) % 12], r.total);
-    });
-    return monthLabels.map((m) => ({ label: m, value: map.get(m) || 0 }));
-  })();
+  const revenueArea = monthLabels.map((m, i) => {
+    const row = (stats?.revenueByMonth || []).find((r) => r.month === i + 1);
+    return { label: m, value: row?.total || 0 };
+  });
+
+  const growthArea = monthLabels.map((m, i) => {
+    const row = (stats?.growthByMonth || []).find((r) => r.month === i + 1);
+    return { label: m, value: row?.total || 0 };
+  });
+
+  const perf = stats?.planPerformance;
+  const revByPeriod = stats?.revenue?.[revPeriod];
 
   return (
     <>
@@ -117,30 +128,66 @@ export default function SubscriptionsPage() {
           ]}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* Top summary cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <SummaryCard
-            label="Total Users"
-            value={formatCompact(stats?.totalUsers)}
+            label="Total Subscribers"
+            value={formatCompact(stats?.subscribers?.active ?? stats?.totalUsers)}
             icon={<UsersIcon />}
             color="#a78bfa"
+            note={`${stats?.subscribers?.month ?? 0} new this month · ${stats?.subscribers?.week ?? 0} this week`}
+          />
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div className="h-12 w-12 rounded-xl inline-flex items-center justify-center text-white" style={{ background: "#fb7185" }}>
+                <DollarIcon />
+              </div>
+              <select
+                value={revPeriod}
+                onChange={(e) => setRevPeriod(e.target.value as RevenuePeriod)}
+                className="h-8 px-2 rounded-md border border-slate-200 text-xs bg-white"
+              >
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="year">This Year</option>
+              </select>
+            </div>
+            <div className="mt-3 text-sm text-slate-500">Subscription Revenue</div>
+            <div className="mt-1 text-2xl font-bold text-slate-900">
+              {formatCurrency(revByPeriod ?? stats?.totalRevenue)}
+            </div>
+            <div className="mt-1 text-xs text-slate-400">{formatCurrency(stats?.revenue?.allTime)} all-time</div>
+          </div>
+          <SummaryCard
+            label="Renewals Due (7 days)"
+            value={formatCompact(stats?.renewals?.dueIn7)}
+            icon={<ClockIcon />}
+            color="#fbbf24"
+            note={`${stats?.renewals?.expired ?? 0} expired subscriptions`}
           />
           <SummaryCard
-            label="Total Revenue"
-            value={formatCurrency(stats?.totalRevenue)}
+            label="Most Popular Plan"
+            value={perf?.mostPopular?.plan || "—"}
             icon={<CrownIcon />}
-            color="#fb7185"
+            color="#0a7a90"
+            note={perf?.mostPopular ? `${perf.mostPopular.total} subscribers` : undefined}
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Plan performance highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <PerfCard title="Highest Revenue" plan={perf?.highestRevenue?.plan} metric={formatCurrency(perf?.highestRevenue?.revenue)} />
+          <PerfCard title="Highest Retention" plan={perf?.highestRetention?.plan} metric={`${perf?.highestRetention?.retentionRate ?? 0}%`} />
+          <PerfCard title="Highest Cancellation" plan={perf?.highestCancellation?.plan} metric={`${perf?.highestCancellation?.cancellationRate ?? 0}%`} tone="danger" />
+          <PerfCard title="Most Popular" plan={perf?.mostPopular?.plan} metric={`${perf?.mostPopular?.total ?? 0} subs`} />
+        </div>
+
+        {/* Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-lg font-semibold">User Subscription Plans</h3>
-              <select className="h-8 px-3 rounded-md border border-slate-200 text-xs">
-                <option>Month</option>
-              </select>
-            </div>
-            <p className="text-sm text-slate-500 mb-4">See User Subscription Plans</p>
+            <h3 className="text-lg font-semibold mb-1">Active Plan Distribution</h3>
+            <p className="text-sm text-slate-500 mb-4">Current subscribers by plan</p>
             {planDistribution.length ? (
               <DonutChart data={planDistribution} />
             ) : (
@@ -149,16 +196,15 @@ export default function SubscriptionsPage() {
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-lg font-semibold">Subscription Revenue Overview</h3>
-              <select className="h-8 px-3 rounded-md border border-slate-200 text-xs">
-                <option>Month</option>
-              </select>
-            </div>
-            <p className="text-sm text-slate-500 mb-4">
-              Track total revenue, platform commission, and payouts over time.
-            </p>
-            <AreaChart data={revenueArea} color="#7c3aed" />
+            <h3 className="text-lg font-semibold mb-1">Subscriber Growth</h3>
+            <p className="text-sm text-slate-500 mb-4">New subscribers by month — {new Date().getFullYear()}</p>
+            <AreaChart data={growthArea} color="#0a7a90" formatValue={(n) => `${Math.round(n)}`} />
+          </div>
+
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-semibold mb-1">Revenue Breakdown</h3>
+            <p className="text-sm text-slate-500 mb-4">Subscription revenue by month</p>
+            <AreaChart data={revenueArea} color="#7c3aed" formatValue={(n) => `$${Math.round(n)}`} />
           </div>
         </div>
 
@@ -268,6 +314,8 @@ export default function SubscriptionsPage() {
             )}
           </div>
         )}
+
+        <SubscriptionRevenueTable />
 
         <PlanModal
           open={creating}
@@ -587,11 +635,13 @@ function SummaryCard({
   value,
   icon,
   color,
+  note,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   color: string;
+  note?: string;
 }) {
   return (
     <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden">
@@ -602,9 +652,110 @@ function SummaryCard({
         {icon}
       </div>
       <div className="mt-3 text-sm text-slate-500">{label}</div>
-      <div className="mt-1 text-3xl font-bold text-slate-900">{value}</div>
-      <div className="absolute right-3 bottom-2 w-40 opacity-80">
-        <MiniArea values={[2, 4, 3, 5, 7, 6, 8, 7, 9, 8]} color={color} height={48} />
+      <div className="mt-1 text-2xl font-bold text-slate-900 truncate">{value}</div>
+      {note && <div className="mt-1 text-xs text-slate-400 truncate">{note}</div>}
+      <div className="absolute right-3 bottom-2 w-24 opacity-70">
+        <MiniArea values={[2, 4, 3, 5, 7, 6, 8, 7, 9, 8]} color={color} height={40} />
+      </div>
+    </div>
+  );
+}
+
+function PerfCard({
+  title,
+  plan,
+  metric,
+  tone,
+}: {
+  title: string;
+  plan?: string;
+  metric: string;
+  tone?: "danger";
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      <div className="text-xs text-slate-500">{title}</div>
+      <div className="mt-1 font-semibold text-slate-900 truncate">{plan || "—"}</div>
+      <div className={`mt-0.5 text-lg font-bold ${tone === "danger" ? "text-red-600" : "text-[#0a7a90]"}`}>
+        {metric}
+      </div>
+    </div>
+  );
+}
+
+function SubscriptionRevenueTable() {
+  const toast = useToast();
+  const [items, setItems] = useState<Transaction[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "subscription" })
+      .then((r) => {
+        setItems(r.data || []);
+        setTotal(r.meta?.total || 0);
+      })
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed"))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit]);
+
+  const planLabel = (t: Transaction) =>
+    !t.plan ? "—" : typeof t.plan === "string" ? t.plan : t.plan.name || "—";
+
+  return (
+    <div className="mt-8">
+      <h3 className="text-lg font-semibold text-slate-900 mb-3">Subscription Revenue</h3>
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        {loading ? (
+          <TableSkeleton rows={6} cols={6} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-slate-500">
+                <tr className="border-b border-slate-100">
+                  <th className="px-5 py-4 font-medium">Transaction ID</th>
+                  <th className="px-5 py-4 font-medium">Username</th>
+                  <th className="px-5 py-4 font-medium">Subscription Plan</th>
+                  <th className="px-5 py-4 font-medium">Amount Paid</th>
+                  <th className="px-5 py-4 font-medium">Date</th>
+                  <th className="px-5 py-4 font-medium text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-10 text-slate-500">
+                      No subscription revenue yet
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((t) => (
+                    <tr key={t._id} className="border-b border-slate-50 last:border-0">
+                      <td className="px-5 py-3 font-medium text-slate-900">
+                        {t.txCode || `TXN-${t._id.slice(-4).toUpperCase()}`}
+                      </td>
+                      <td className="px-5 py-3">{t.user?.name || "—"}</td>
+                      <td className="px-5 py-3">{planLabel(t)}</td>
+                      <td className="px-5 py-3 font-medium text-emerald-600">{formatCurrency(t.amount)}</td>
+                      <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
+                      <td className="px-5 py-3 text-right">
+                        <StatusBadge status={t.status} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="px-5 py-3">
+          <Pagination page={page} limit={limit} total={total} onPage={setPage} onLimit={(l) => { setLimit(l); setPage(1); }} />
+        </div>
       </div>
     </div>
   );

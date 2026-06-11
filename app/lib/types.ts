@@ -14,15 +14,57 @@ export interface AdminUser {
   status: UserStatus;
   profilePhoto?: string;
   country?: string;
+  state?: string;
   city?: string;
   currency?: string;
+  timezone?: string;
+  dateOfBirth?: string;
   /** Legacy free-text label; still used as the sub-admin role label. */
   location?: string;
   permissions?: string[];
+  roleKey?: string;
+  jobTitle?: string;
   isVerified?: boolean;
+  isOnline?: boolean;
+  createdBy?: { _id?: string; name?: string; email?: string } | string | null;
   createdAt?: string;
   updatedAt?: string;
   lastLoginAt?: string;
+  lastActiveAt?: string;
+}
+
+export interface PermissionItem {
+  key: string;
+  label: string;
+}
+export interface PermissionGroup {
+  section: string;
+  permissions: PermissionItem[];
+}
+export interface RolePreset {
+  key: string;
+  label: string;
+  description: string;
+  permissions: string[];
+}
+export interface PermissionsCatalog {
+  groups: PermissionGroup[];
+  permissions: string[];
+  roles: RolePreset[];
+}
+
+export interface AdminActivity {
+  _id: string;
+  action: string;
+  description?: string;
+  targetType?: string;
+  targetUser?: { _id?: string; name?: string; email?: string; role?: string } | null;
+  createdAt: string;
+}
+
+export interface SubAdminDetails extends AdminUser {
+  roleLabel?: string;
+  recentActivity?: AdminActivity[];
 }
 
 export interface PaginationMeta {
@@ -89,7 +131,36 @@ export interface AdvisorProfile {
   earnings?: number;
   retentionRate?: number;
   refundIndex?: number;
-  weeklySchedule?: Record<string, { start?: string; end?: string }>;
+  isOnline?: boolean;
+  lastSeenAt?: string;
+  autoOnlineMode?: boolean;
+  weeklySchedule?: Record<string, { enabled?: boolean; from?: string; to?: string }>;
+}
+
+export interface AdvisorMetrics {
+  sessions: {
+    total: number;
+    completed: number;
+    cancelled: number;
+    missed: number;
+    avgSessionMinutes: number;
+    repeatClientRate: number;
+    retentionRate: number;
+  };
+  finance: {
+    totalRevenue: number;
+    advisorEarnings: number;
+    platformEarnings: number;
+    pendingPayouts: number;
+    totalPaidOut: number;
+    refundAmount: number;
+    chargebackAmount: number;
+  };
+  availability: {
+    isOnline: boolean;
+    availableNow: boolean;
+    weeklySchedule: Record<string, { enabled?: boolean; from?: string; to?: string }> | null;
+  };
 }
 
 export interface AdvisorListItem {
@@ -154,7 +225,8 @@ export interface SessionItem {
     | "completed"
     | "cancelled"
     | "disputed"
-    | "flagged";
+    | "flagged"
+    | "no_show";
   duration?: number;
   actualDurationSec?: number;
   startedAt?: string;
@@ -165,8 +237,24 @@ export interface SessionItem {
   cancelledAt?: string;
   createdAt: string;
   recordingUrl?: string;
+  transcriptUrl?: string;
+  hasTranscript?: boolean;
+  messageCount?: number;
   egressId?: string;
   livekitRoom?: string;
+}
+
+export interface TranscriptMessage {
+  _id: string;
+  text?: string;
+  attachments?: string[];
+  createdAt: string;
+  sender?: { _id?: string; name?: string; profilePhoto?: string };
+}
+
+export interface TranscriptResponse {
+  session: SessionItem;
+  messages: TranscriptMessage[];
 }
 
 export interface Complaint {
@@ -216,13 +304,18 @@ export interface Dispute {
 
 export interface Transaction {
   _id: string;
+  txCode?: string;
   type: string;
   status: string;
   user?: AdminUser;
   advisor?: AdminUser;
+  plan?: { _id?: string; name?: string } | string;
   amount: number;
+  currency?: string;
+  provider?: string;
+  withdrawalMethod?: string;
   description?: string;
-  withdrawalStatus?: "requested" | "paid" | "rejected";
+  withdrawalStatus?: "requested" | "approved" | "paid" | "rejected";
   createdAt: string;
 }
 
@@ -341,7 +434,31 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export type DashboardPeriod = "day" | "week" | "month" | "year";
+
 export interface DashboardOverview {
+  period?: DashboardPeriod;
+  metrics?: {
+    newUsers: number;
+    newAdvisors: number;
+    sessions: number;
+    subscriptions: number;
+    revenue: number;
+  };
+  newSubsByPlan?: Array<{ label: string; value: number }>;
+  appointments?: { today: number; week: number; month: number };
+  refunds?: { today: number; week: number; month: number; year: number; amountYear: number };
+  serviceCategories?: Array<{ label: string; value: number; color?: string }>;
+  advisorPerformance?: {
+    total: number;
+    active: number;
+    online: number;
+    suspended: number;
+    topPerformers: Array<{ name: string; profilePhoto?: string; sessions: number; rating: number }>;
+  };
+  approvals?: { approved: number; pending: number; rejected: number };
+  revenueByMonth?: Array<{ month: number; total: number }>;
+  recentTransactions: Transaction[];
   totals: {
     users: number;
     advisors: number;
@@ -349,11 +466,19 @@ export interface DashboardOverview {
     sessions: number;
     revenue: number;
   };
-  usersByDay: Array<{ _id: number; count: number }>;
-  advisorsByCategory: Array<{ _id: string | null; count: number }>;
-  revenueByMonth: Array<{ _id: { y: number; m: number }; total: number }>;
-  popularCategories: Array<{ _id: string | null; count: number }>;
-  recentTransactions: Transaction[];
+}
+
+export interface PeriodAmounts {
+  today: number;
+  week: number;
+  month: number;
+  year: number;
+  allTime: number;
+}
+
+export interface AmountCount {
+  amount: number;
+  count: number;
 }
 
 export interface FinanceOverview {
@@ -361,6 +486,32 @@ export interface FinanceOverview {
   pendingPayouts: number;
   pendingPayoutsCount: number;
   platformCommission: number;
+  platformRevenue?: PeriodAmounts;
+  netRevenue?: PeriodAmounts;
+  wallet?: { totalDeposits: number; totalBalance: number; totalFreeCredits: number };
+  payouts?: {
+    pending: AmountCount;
+    approved: AmountCount;
+    paid: AmountCount;
+    failed: AmountCount;
+  };
+  advisors?: {
+    totalEarnings: number;
+    topEarner?: { name: string; profilePhoto?: string; amount: number } | null;
+    lowestRated?: { name: string; rating: number } | null;
+  };
+  revenueByMonth?: Array<{ month: number; total: number }>;
+  revenueSources?: Record<string, number>;
+}
+
+export interface AdvisorEarning {
+  advisor: { _id: string; name: string; email?: string; profilePhoto?: string } | null;
+  tier: "bronze" | "silver" | "gold";
+  totalSessions: number;
+  grossEarnings: number;
+  platformCommission: number;
+  netEarnings: number;
+  paidEarnings: number;
 }
 
 export interface Commissions {
@@ -369,9 +520,30 @@ export interface Commissions {
   gold: number;
 }
 
+export interface PlanPerformance {
+  plan: string;
+  total: number;
+  active: number;
+  cancelled: number;
+  revenue: number;
+  retentionRate: number;
+  cancellationRate: number;
+}
+
 export interface SubscriptionStats {
   totalUsers: number;
   totalRevenue: number;
   planDistribution: Array<{ _id: string; count: number }>;
-  revenueByMonth: Array<{ _id: { y: number; m: number }; total: number }>;
+  revenueByMonth: Array<{ month: number; total: number }>;
+  subscribers?: { total: number; active: number; today: number; week: number; month: number };
+  revenue?: { today: number; week: number; month: number; year: number; allTime: number };
+  planPerformance?: {
+    mostPopular?: PlanPerformance | null;
+    highestRevenue?: PlanPerformance | null;
+    highestRetention?: PlanPerformance | null;
+    highestCancellation?: PlanPerformance | null;
+  };
+  plans?: PlanPerformance[];
+  renewals?: { dueIn7: number; expired: number };
+  growthByMonth?: Array<{ month: number; total: number; plans: Record<string, number> }>;
 }

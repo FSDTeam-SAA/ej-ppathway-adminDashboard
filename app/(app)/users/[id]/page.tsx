@@ -81,7 +81,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
     }
     setResetLoading(true);
     try {
-      await api.post(`/admin/users/${id}/reset-password`, { newPassword: newPwd });
+      await api.patch(`/admin/users/${id}/reset-password`, { newPassword: newPwd });
       toast.success("Password reset");
       setResetOpen(false);
       setNewPwd("");
@@ -99,7 +99,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
     try {
       const isSuspended = data.user.status === "suspended";
       const path = `/admin/users/${id}/${isSuspended ? "unsuspend" : "suspend"}`;
-      await api.post(path, {});
+      await api.patch(path, {});
       toast.success(isSuspended ? "User unsuspended" : "User suspended");
       setConfirmSuspend(false);
       load();
@@ -160,6 +160,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                 <Field label="Email" value={data.user.email} />
                 <Field label="Phone" value={data.user.phone || "—"} />
                 <Field label="Country" value={countryName(data.user.country) || "—"} />
+                <Field label="State" value={data.user.state || "—"} />
                 <Field label="City" value={data.user.city || "—"} />
                 <Field
                   label="Currency"

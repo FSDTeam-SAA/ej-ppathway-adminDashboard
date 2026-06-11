@@ -25,7 +25,10 @@ import type { AdvisorListItem } from "../../lib/types";
 const TABS = [
   { value: "all", label: "All" },
   { value: "active", label: "Active" },
+  { value: "deactivated", label: "Deactivated" },
   { value: "suspended", label: "Suspended" },
+  { value: "online", label: "Online" },
+  { value: "available_now", label: "Available Now" },
 ];
 
 export default function AdvisorsPage() {
@@ -94,7 +97,7 @@ export default function AdvisorsPage() {
     try {
       const isSuspended = confirm.user.status === "suspended";
       const path = `/admin/advisors/${confirm.user._id}/${isSuspended ? "unsuspend" : "suspend"}`;
-      await api.post(path, {});
+      await api.patch(path, {});
       toast.success(isSuspended ? "Advisor reactivated" : "Advisor suspended");
       setConfirm(null);
       load();
@@ -270,7 +273,7 @@ export default function AdvisorsPage() {
           title={`Delete ${bulk.selectedCount} advisor${
             bulk.selectedCount === 1 ? "" : "s"
           }?`}
-          description="This deactivates the selected advisor accounts."
+          description="This permanently removes the selected advisor accounts from the system. This cannot be undone."
           confirmText="Delete"
           danger
           loading={actionLoading}
@@ -326,12 +329,19 @@ function AddAdvisorModal({
     email: "",
     phoneNumber: "",
     country: "",
+    state: "",
     city: "",
+    timezone: "",
+    professionalTitle: "",
     language: "",
     password: "",
     experience: "",
+    tier: "bronze",
     type: "",
     style: "",
+    chatPerMin: "",
+    callPerMin: "",
+    videoPerMin: "",
     bio: "",
   });
   const countries = useCountries();
@@ -349,7 +359,28 @@ function AddAdvisorModal({
     }
     setLoading(true);
     try {
-      await api.post("/admin/advisors", form);
+      await api.post("/admin/advisors", {
+        name: form.name,
+        email: form.email,
+        phoneNumber: form.phoneNumber,
+        password: form.password,
+        country: form.country,
+        state: form.state,
+        city: form.city,
+        timezone: form.timezone,
+        professionalTitle: form.professionalTitle,
+        languages: form.language,
+        experience: form.experience,
+        tier: form.tier,
+        expertise: form.type,
+        styles: form.style,
+        bio: form.bio,
+        pricing: {
+          chatPerMin: form.chatPerMin,
+          callPerMin: form.callPerMin,
+          videoPerMin: form.videoPerMin,
+        },
+      });
       setCreated({ email: form.email, password: form.password });
       onCreated();
     } catch (err) {
@@ -362,7 +393,7 @@ function AddAdvisorModal({
 
   const handleClose = () => {
     setCreated(null);
-    setForm({ name: "", email: "", phoneNumber: "", country: "", city: "", language: "", password: "", experience: "", type: "", style: "", bio: "" });
+    setForm({ name: "", email: "", phoneNumber: "", country: "", state: "", city: "", timezone: "", professionalTitle: "", language: "", password: "", experience: "", tier: "bronze", type: "", style: "", chatPerMin: "", callPerMin: "", videoPerMin: "", bio: "" });
     onClose();
   };
 
@@ -421,6 +452,12 @@ function AddAdvisorModal({
             emptyText="No country found."
           />
         </label>
+        <Input
+          label="Enter State / Region"
+          value={form.state}
+          onChange={(e) => onChange("state", e.target.value)}
+          placeholder="e.g. California"
+        />
         <label className="block">
           <span className="block mb-1.5 text-sm font-medium text-slate-700">
             Choose City
@@ -437,7 +474,19 @@ function AddAdvisorModal({
           />
         </label>
         <Input
-          label="Choose Language"
+          label="Time Zone"
+          value={form.timezone}
+          onChange={(e) => onChange("timezone", e.target.value)}
+          placeholder="e.g. America/New_York"
+        />
+        <Input
+          label="Professional Title"
+          value={form.professionalTitle}
+          onChange={(e) => onChange("professionalTitle", e.target.value)}
+          placeholder="e.g. Spiritual Guide & Tarot Reader"
+        />
+        <Input
+          label="Languages"
           value={form.language}
           onChange={(e) => onChange("language", e.target.value)}
           placeholder="e.g. English, Spanish"
@@ -455,19 +504,64 @@ function AddAdvisorModal({
           onChange={(e) => onChange("experience", e.target.value)}
           placeholder="e.g. 5 years"
         />
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">
+            Tier Rank
+          </span>
+          <Combobox
+            options={[
+              { value: "bronze", label: "🥉 Bronze" },
+              { value: "silver", label: "🥈 Silver" },
+              { value: "gold", label: "🏅 Gold" },
+            ]}
+            value={form.tier}
+            onChange={(v) => onChange("tier", v)}
+            placeholder="Select tier…"
+            searchPlaceholder="Search tiers…"
+            emptyText="No tier found."
+          />
+        </label>
         <Input
-          label="Choose Type"
+          label="Expertise Areas"
           value={form.type}
           onChange={(e) => onChange("type", e.target.value)}
-          placeholder="e.g. Love & Relationship"
+          placeholder="e.g. Love & Relationship, Career"
         />
         <Input
-          label="Choose Style"
+          label="Styles"
           value={form.style}
           onChange={(e) => onChange("style", e.target.value)}
-          placeholder="e.g. Compassionate"
+          placeholder="e.g. Compassionate, Direct"
         />
       </div>
+
+      <div className="mt-5">
+        <p className="text-sm font-semibold text-slate-700 mb-2">Price Per Minute</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input
+            label="Chat ($/min)"
+            type="number"
+            value={form.chatPerMin}
+            onChange={(e) => onChange("chatPerMin", e.target.value)}
+            placeholder="e.g. 1.00"
+          />
+          <Input
+            label="Call ($/min)"
+            type="number"
+            value={form.callPerMin}
+            onChange={(e) => onChange("callPerMin", e.target.value)}
+            placeholder="e.g. 1.20"
+          />
+          <Input
+            label="Video ($/min)"
+            type="number"
+            value={form.videoPerMin}
+            onChange={(e) => onChange("videoPerMin", e.target.value)}
+            placeholder="e.g. 1.50"
+          />
+        </div>
+      </div>
+
       <div className="mt-4">
         <Textarea
           label="Enter Bio"

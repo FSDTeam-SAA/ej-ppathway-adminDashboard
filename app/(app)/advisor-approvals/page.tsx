@@ -21,10 +21,10 @@ import type { AdvisorApplication } from "../../lib/types";
 const TABS = [
   { value: "all", label: "All" },
   { value: "new", label: "New" },
+  { value: "interview_pending", label: "Interview" },
   { value: "under_review", label: "Under Review" },
-  { value: "interview_pending", label: "Interview Pending" },
   { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "rejected", label: "Not Selected" },
 ];
 
 export default function AdvisorApprovalsPage() {

@@ -102,7 +102,7 @@ export default function UsersListPage() {
       const path = `/admin/users/${confirm._id}/${
         isSuspended ? "unsuspend" : "suspend"
       }`;
-      await api.post(path, {});
+      await api.patch(path, {});
       toast.success(isSuspended ? "User unsuspended" : "User suspended");
       setConfirm(null);
       load();

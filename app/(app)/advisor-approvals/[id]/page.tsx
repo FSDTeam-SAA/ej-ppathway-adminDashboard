@@ -9,13 +9,13 @@ import { Button } from "../../../components/ui/Button";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Input, Textarea } from "../../../components/ui/Input";
 import { Skeleton, CardSkeleton } from "../../../components/Skeleton";
-import { ChevronLeftIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
+import { ChevronLeftIcon } from "../../../components/Icons";
 import { MapPin } from "lucide-react";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatDate } from "../../../lib/format";
 import { useCountryName, formatLocation } from "../../../lib/countries";
-import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
+import { useCurrencyCatalog } from "../../../lib/currency";
 import type { AdvisorApplication } from "../../../lib/types";
 
 export default function ApplicationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -260,17 +260,6 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
               </div>
 
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <h3 className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                  <span>💲</span> Pricing
-                </h3>
-                <div className="space-y-3">
-                  <PricingRow icon={<ChatIcon />} label="Chat" value={data.pricing?.chatPerMin} symbol={symbolFor(data.user?.currency)} />
-                  <PricingRow icon={<CallIcon />} label="Call" value={data.pricing?.callPerMin} symbol={symbolFor(data.user?.currency)} />
-                  <PricingRow icon={<VideoIcon />} label="Video" value={data.pricing?.videoPerMin} symbol={symbolFor(data.user?.currency)} />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">Admin Pipeline</h3>
                 <div className="space-y-3">
                   <button
@@ -299,7 +288,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     onClick={() => setConfirmReject(true)}
                     className="w-full"
                   >
-                    ✕ Reject Application
+                    ✕ Not Selected
                   </Button>
                 </div>
               </div>
@@ -537,28 +526,3 @@ function ChipsField({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function PricingRow({
-  icon,
-  label,
-  value,
-  symbol = "$",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value?: number;
-  symbol?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="inline-flex items-center gap-2 text-slate-700">
-        <span className="text-[#0a7a90]">{icon}</span>
-        {label}
-      </span>
-      <span className="font-semibold text-slate-900">
-        {value !== undefined && value !== null
-          ? `${symbol}${value}/min`
-          : "—"}
-      </span>
-    </div>
-  );
-}
