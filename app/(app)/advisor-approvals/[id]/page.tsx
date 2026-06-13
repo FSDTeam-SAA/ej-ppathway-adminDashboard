@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Topbar } from "../../../components/Topbar";
 import { Avatar } from "../../../components/ui/Avatar";
-import { Badge, StatusBadge } from "../../../components/ui/Badge";
+import { StatusBadge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Input, Textarea } from "../../../components/ui/Input";
@@ -50,6 +50,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
 
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [approveLoading, setApproveLoading] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -150,6 +151,20 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     }
   };
 
+  const updateStatus = async (nextStatus: string) => {
+    setStatusLoading(true);
+    try {
+      await api.patch(`/admin/advisor-applications/${id}/status`, { status: nextStatus });
+      toast.success("Application status updated");
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed";
+      toast.error(msg);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   return (
     <>
       <Topbar />
@@ -197,18 +212,46 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     <h2 className="text-2xl font-bold text-slate-900">{data.user?.name}</h2>
                     <p className="text-slate-500">{data.professionalTitle || "I am a professional advisor"}</p>
                     <p className="text-slate-500 text-sm flex items-center gap-1"><MapPin size={14} className="shrink-0" />{formatLocation(data.user?.city, countryName(data.user?.country)) || "—"}</p>
-                    <div className="mt-2">
-                      <Badge tone="warning">Under Review</Badge>
+                    <div className="mt-3 flex flex-wrap items-end gap-3">
+                      <StatusBadge status={data.status} />
+                      <label className="block">
+                        <span className="block mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                          Application Status
+                        </span>
+                        <select
+                          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                          value={toApplicationStatusValue(data)}
+                          onChange={(e) => updateStatus(e.target.value)}
+                          disabled={statusLoading || approveLoading || rejectLoading}
+                        >
+                          <option value="new">New</option>
+                          <option value="under_review">Under Review</option>
+                          <option value="interview_pending">Interview</option>
+                        </select>
+                      </label>
                     </div>
                   </div>
                 </div>
 
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">Basic Information</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">Application Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Field label="Name" value={data.user?.name || "—"} />
                   <Field label="Email" value={data.user?.email || "—"} />
                   <Field label="Experience" value={String(data.yearsOfExperience || "—")} />
+                  <Field label="Availability" value={yesNoLabel(data.availableFiveHoursPerDay)} />
+                  <Field
+                    label="Baptized with Holy Spirit"
+                    value={yesNoLabel(data.baptizedInHolySpirit)}
+                  />
                   <Field label="Submitted" value={formatDate(data.createdAt, true)} />
+                  <Field label="Date of Birth" value={data.applicantDetails?.dateOfBirth || "â€”"} />
+                  <Field label="Address" value={data.applicantDetails?.address || "â€”"} />
+                  <Field label="State" value={data.applicantDetails?.state || "â€”"} />
+                  <Field label="City" value={data.applicantDetails?.city || "â€”"} />
+                  <Field
+                    label="Country"
+                    value={countryName(data.applicantDetails?.country) || data.applicantDetails?.country || "â€”"}
+                  />
                 </div>
               </div>
 
@@ -524,5 +567,20 @@ function ChipsField({ label, items }: { label: string; items: string[] }) {
       </div>
     </div>
   );
+}
+
+function toApplicationStatusValue(data: AdvisorApplication) {
+  if (data.status === "under_review") return "under_review";
+  if (data.stage === "pre_recorded_interview" || data.stage === "live_interview") {
+    return "interview_pending";
+  }
+  return "new";
+}
+
+function yesNoLabel(value?: string) {
+  if (!value) return "-";
+  if (value.toLowerCase() === "yes") return "Yes";
+  if (value.toLowerCase() === "no") return "No";
+  return value;
 }
 

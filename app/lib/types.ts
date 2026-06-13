@@ -189,6 +189,8 @@ export interface AdvisorApplication {
   professionalTitle?: string;
   bio?: string;
   yearsOfExperience?: string;
+  availableFiveHoursPerDay?: string;
+  baptizedInHolySpirit?: string;
   expertise?: string[];
   styles?: string[];
   languages?: string[];
@@ -210,6 +212,14 @@ export interface AdvisorApplication {
     signedPdfUrl?: string;
   };
   rejectionReason?: string;
+  applicantDetails?: {
+    dateOfBirth?: string;
+    address?: string;
+    state?: string;
+    city?: string;
+    zip?: string;
+    country?: string;
+  };
   createdAt: string;
 }
 
