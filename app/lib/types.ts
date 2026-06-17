@@ -103,6 +103,18 @@ export interface UserDetailsResponse {
   sessionsCount?: number;
   totalSpent?: number;
   activeSubscription?: { plan?: { name: string } | string; planName?: string } | null;
+  subscriptions?: Array<{
+    _id: string;
+    plan?: { name?: string } | string;
+    planName?: string;
+    status: string;
+    pricePerMonthUsd?: number;
+    createdAt?: string;
+    renewsAt?: string;
+  }>;
+  recentTransactions?: Transaction[];
+  refunds?: Transaction[];
+  adminActivity?: AdminActivity[];
   recentSessions?: SessionItem[];
 }
 
@@ -179,6 +191,8 @@ export interface AdvisorApplication {
     | "decision";
   status:
     | "new"
+    | "pending_review"
+    | "live_interview"
     | "under_review"
     | "interview_pending"
     | "scheduled"

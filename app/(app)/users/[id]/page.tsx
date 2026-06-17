@@ -194,6 +194,94 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <section className="bg-[#e6f2f6]/40 rounded-xl p-5">
+                <h3 className="font-semibold text-slate-900 mb-4">Billing & Subscription Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Active Plan" value={getPlanName(data.activeSubscription)} />
+                  <Field label="Wallet Balance" value={formatCurrency(data.wallet?.balance)} />
+                  <Field label="Free Credits" value={formatCurrency(data.wallet?.freeCredits)} />
+                  <Field label="Total Spent" value={formatCurrency(data.totalSpent)} />
+                </div>
+                <div className="mt-4 space-y-2">
+                  {(data.subscriptions || []).slice(0, 3).map((s) => (
+                    <div key={s._id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                      <span className="font-medium text-slate-800">{subscriptionPlanName(s)}</span>
+                      <span className="text-slate-500">{s.status}</span>
+                    </div>
+                  ))}
+                  {(!data.subscriptions || data.subscriptions.length === 0) && (
+                    <p className="text-sm text-slate-500">No subscription history</p>
+                  )}
+                </div>
+              </section>
+
+              <section className="bg-[#e6f2f6]/40 rounded-xl p-5">
+                <h3 className="font-semibold text-slate-900 mb-4">Account Status & Credential Management</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Field label="Account Status" value={data.user.status} />
+                  <Field label="Email Verified" value={data.user.isVerified ? "Yes" : "No"} />
+                  <Field label="Last Login" value={formatDate(data.user.lastLoginAt)} />
+                  <Field label="Joined" value={formatDate(data.user.createdAt)} />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button variant="outline" onClick={() => setResetOpen(true)}>
+                    Reset Password
+                  </Button>
+                  <Button
+                    variant={data.user.status === "suspended" ? "primary" : "danger"}
+                    onClick={() => setConfirmSuspend(true)}
+                  >
+                    {data.user.status === "suspended" ? "Activate Account" : "Deactivate Account"}
+                  </Button>
+                </div>
+              </section>
+            </div>
+
+            <section className="mb-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-3">Transaction & Refund History</h3>
+              <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+                {(data.recentTransactions || []).length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {(data.recentTransactions || []).slice(0, 8).map((t) => (
+                      <div key={t._id} className="grid grid-cols-1 md:grid-cols-4 gap-2 px-4 py-3 text-sm">
+                        <span className="font-medium text-slate-900">{t.txCode || t._id.slice(-6).toUpperCase()}</span>
+                        <span className="capitalize text-slate-600">{t.type.replace(/_/g, " ")}</span>
+                        <span className={t.type.includes("refund") ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}>
+                          {formatCurrency(t.amount)}
+                        </span>
+                        <span className="text-slate-500 md:text-right">{formatDate(t.createdAt, true)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-4 py-6 text-sm text-slate-500">No transaction history</p>
+                )}
+              </div>
+              {(data.refunds || []).length > 0 && (
+                <p className="mt-2 text-sm text-slate-500">
+                  Refunds issued: {(data.refunds || []).length}
+                </p>
+              )}
+            </section>
+
+            <section className="mb-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-3">Admin Activity Log</h3>
+              <div className="space-y-2">
+                {(data.adminActivity || []).length > 0 ? (
+                  (data.adminActivity || []).map((a) => (
+                    <div key={a._id} className="rounded-xl border border-slate-100 px-4 py-3 text-sm">
+                      <div className="font-medium text-slate-900">{a.action}</div>
+                      <div className="text-slate-600">{a.description || "No description"}</div>
+                      <div className="text-xs text-slate-400 mt-1">{formatDate(a.createdAt, true)}</div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-slate-500">No admin activity recorded</p>
+                )}
+              </div>
+            </section>
+
             <h3 className="text-lg font-semibold text-slate-900 mb-3">Session History</h3>
             {data.recentSessions && data.recentSessions.length > 0 ? (
               <div className="space-y-2">
@@ -328,6 +416,11 @@ function getPlanName(sub?: UserDetailsResponse["activeSubscription"]) {
   if (planObj && typeof planObj === "object" && "name" in planObj) return planObj.name as string;
   if (sub.planName) return sub.planName;
   return "—";
+}
+function subscriptionPlanName(sub: NonNullable<UserDetailsResponse["subscriptions"]>[number]) {
+  if (sub.planName) return sub.planName;
+  if (typeof sub.plan === "string") return sub.plan;
+  return sub.plan?.name || "Plan";
 }
 
 function sessionIcon(type?: string) {

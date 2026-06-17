@@ -39,10 +39,14 @@ type ListMeta = {
 
 export default function CompliancePage() {
   const [section, setSection] = useState<"complaints" | "disputes">("complaints");
+  const [q, setQ] = useState("");
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search compliance cases by user, advisor, or issue ..."
+        onSearch={setQ}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Compliance & Safety"
@@ -75,13 +79,13 @@ export default function CompliancePage() {
             Disputes
           </button>
         </div>
-        {section === "complaints" ? <ComplaintsSection /> : <DisputesSection />}
+        {section === "complaints" ? <ComplaintsSection q={q} /> : <DisputesSection q={q} />}
       </main>
     </>
   );
 }
 
-function ComplaintsSection() {
+function ComplaintsSection({ q }: { q: string }) {
   const toast = useToast();
   const [tab, setTab] = useState("all");
   const [items, setItems] = useState<Complaint[]>([]);
@@ -105,6 +109,7 @@ function ComplaintsSection() {
         page,
         limit,
         status: tab === "all" ? undefined : tab,
+        q: q || undefined,
       });
       setItems(r.data || []);
       const m = (r.meta || {}) as ListMeta;
@@ -140,7 +145,7 @@ function ComplaintsSection() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit]);
+  }, [tab, page, limit, q]);
 
   const updateStatus = async (status: "complete" | "rejected" | "reviewing") => {
     if (!details) return;
@@ -395,7 +400,7 @@ const RESOLUTION_OPTIONS: { value: DisputeResolution; label: string }[] = [
   { value: "no_action", label: "No action" },
 ];
 
-function DisputesSection() {
+function DisputesSection({ q }: { q: string }) {
   const toast = useToast();
   const [tab, setTab] = useState<DisputeStatus | "all">("all");
   const [items, setItems] = useState<Dispute[]>([]);
@@ -420,6 +425,7 @@ function DisputesSection() {
         page,
         limit,
         status: tab === "all" ? undefined : tab,
+        q: q || undefined,
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
@@ -433,7 +439,7 @@ function DisputesSection() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit]);
+  }, [tab, page, limit, q]);
 
   const closeAll = () => {
     setDetails(null);
@@ -450,7 +456,7 @@ function DisputesSection() {
     if (!details) return;
     setActionLoading(true);
     try {
-      await api.post(`/admin/disputes/${details._id}/investigating`);
+      await api.patch(`/admin/disputes/${details._id}/investigating`);
       toast.success("Marked as investigating");
       closeAll();
       load();
@@ -488,7 +494,7 @@ function DisputesSection() {
     }
     setActionLoading(true);
     try {
-      await api.post(`/admin/disputes/${details._id}/resolve`, body);
+      await api.patch(`/admin/disputes/${details._id}/resolve`, body);
       toast.success("Dispute resolved");
       closeAll();
       load();
@@ -503,7 +509,7 @@ function DisputesSection() {
     if (!details) return;
     setActionLoading(true);
     try {
-      await api.post(`/admin/disputes/${details._id}/reject`, { note });
+      await api.patch(`/admin/disputes/${details._id}/reject`, { note });
       toast.success("Dispute rejected");
       closeAll();
       load();

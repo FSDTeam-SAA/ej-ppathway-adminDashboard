@@ -90,6 +90,7 @@ export default function FinancePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [tab, setTab] = useState("transactions");
+  const [q, setQ] = useState("");
   const [period, setPeriod] = useState<Period>("month");
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const initialTxnId = searchParams.get("txn") || undefined;
@@ -117,7 +118,10 @@ export default function FinancePage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search finance by transaction, user, advisor, or description ..."
+        onSearch={setQ}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Revenue & Finance"
@@ -228,14 +232,15 @@ export default function FinancePage() {
 
         {tab === "transactions" && (
           <TransactionsTab
+            q={q}
             initialTxnId={initialTxnId}
             onInitialTxnOpened={handleTxnOpened}
           />
         )}
         {tab === "advisor-earnings" && <AdvisorEarningsTab />}
-        {tab === "payouts" && <PayoutsTab />}
-        {tab === "refunds" && <RefundsTab />}
-        {tab === "subscriptions" && <SubscriptionRevenueTab />}
+        {tab === "payouts" && <PayoutsTab q={q} />}
+        {tab === "refunds" && <RefundsTab q={q} />}
+        {tab === "subscriptions" && <SubscriptionRevenueTab q={q} />}
         {tab === "commissions" && <CommissionsTab />}
       </main>
     </>
@@ -243,9 +248,11 @@ export default function FinancePage() {
 }
 
 function TransactionsTab({
+  q,
   initialTxnId,
   onInitialTxnOpened,
 }: {
+  q: string;
   initialTxnId?: string;
   onInitialTxnOpened?: () => void;
 }) {
@@ -266,7 +273,7 @@ function TransactionsTab({
   useEffect(() => {
     setLoading(true);
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, q: q || undefined })
       .then((r) => {
         const loaded = r.data || [];
         setItems(loaded);
@@ -287,7 +294,7 @@ function TransactionsTab({
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, reloadKey]);
+  }, [page, limit, reloadKey, q]);
 
   const handleBulkDelete = async () => {
     if (bulk.selectedCount === 0) return;
@@ -461,7 +468,7 @@ function planName(t: Transaction): string {
   return t.plan.name || "—";
 }
 
-function SubscriptionRevenueTab() {
+function SubscriptionRevenueTab({ q }: { q: string }) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>([]);
   const [page, setPage] = useState(1);
@@ -472,7 +479,7 @@ function SubscriptionRevenueTab() {
   useEffect(() => {
     setLoading(true);
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "subscription" })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "subscription", q: q || undefined })
       .then((r) => {
         setItems(r.data || []);
         setTotal(r.meta?.total || 0);
@@ -480,7 +487,7 @@ function SubscriptionRevenueTab() {
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed"))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit]);
+  }, [page, limit, q]);
 
   return (
     <div>
@@ -538,7 +545,7 @@ function SubscriptionRevenueTab() {
   );
 }
 
-function RefundsTab() {
+function RefundsTab({ q }: { q: string }) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>([]);
   const [page, setPage] = useState(1);
@@ -550,7 +557,7 @@ function RefundsTab() {
     setLoading(true);
     // session refunds first; admins can review chargebacks/disputes in Compliance.
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "session_refund" })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "session_refund", q: q || undefined })
       .then((r) => {
         setItems(r.data || []);
         setTotal(r.meta?.total || 0);
@@ -558,7 +565,7 @@ function RefundsTab() {
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Failed"))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit]);
+  }, [page, limit, q]);
 
   return (
     <div>
@@ -730,7 +737,7 @@ function DetailRow({
   );
 }
 
-function PayoutsTab() {
+function PayoutsTab({ q }: { q: string }) {
   const toast = useToast();
   const [items, setItems] = useState<Transaction[]>([]);
   const [status, setStatus] = useState<"requested" | "paid" | "rejected">("requested");
@@ -743,7 +750,12 @@ function PayoutsTab() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get<Transaction[]>("/admin/finance/payouts", { page, limit, status });
+      const r = await api.get<Transaction[]>("/admin/finance/payouts", {
+        page,
+        limit,
+        status,
+        q: q || undefined,
+      });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
     } catch (err) {
@@ -756,7 +768,7 @@ function PayoutsTab() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, status]);
+  }, [page, limit, status, q]);
 
   const approve = async (id: string) => {
     setActionLoadingId(id);
@@ -901,7 +913,7 @@ function CommissionsTab() {
   const save = async () => {
     setSaving(true);
     try {
-      await api.put("/admin/finance/commissions", comm);
+      await api.patch("/admin/finance/commissions", comm);
       toast.success("Commissions updated");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";

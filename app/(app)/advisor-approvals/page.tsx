@@ -20,8 +20,9 @@ import type { AdvisorApplication } from "../../lib/types";
 
 const TABS = [
   { value: "all", label: "All" },
-  { value: "new", label: "New" },
-  { value: "interview_pending", label: "Interview" },
+  { value: "new", label: "Application" },
+  { value: "pending_review", label: "Pending Review" },
+  { value: "live_interview", label: "Live Interview" },
   { value: "under_review", label: "Under Review" },
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Not Selected" },
@@ -32,6 +33,7 @@ export default function AdvisorApprovalsPage() {
   const [items, setItems] = useState<AdvisorApplication[]>([]);
   const [tab, setTab] = useState("all");
   const [page, setPage] = useState(1);
+  const [q, setQ] = useState("");
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,7 @@ export default function AdvisorApprovalsPage() {
         page,
         limit,
         status: tab === "all" ? undefined : tab,
+        q: q || undefined,
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
@@ -62,7 +65,7 @@ export default function AdvisorApprovalsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit]);
+  }, [tab, page, limit, q]);
 
   const handleBulkDelete = async () => {
     if (bulk.selectedCount === 0) return;
@@ -84,7 +87,13 @@ export default function AdvisorApprovalsPage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search applications by applicant, email, or expertise ..."
+        onSearch={(value) => {
+          setPage(1);
+          setQ(value);
+        }}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Advisor Approvals"
@@ -218,11 +227,11 @@ export default function AdvisorApprovalsPage() {
 function stageLabel(stage?: string) {
   switch (stage) {
     case "application":
-      return "Stage 1 - Application";
+      return "Application";
     case "pre_recorded_interview":
-      return "Stage 2 - Pre-rec.interview";
+      return "Pending Review";
     case "live_interview":
-      return "Stage 3 - Live interview";
+      return "Live Interview";
     case "contract":
       return "Stage 4 - Contract";
     case "decision":

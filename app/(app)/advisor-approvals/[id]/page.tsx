@@ -51,6 +51,8 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [approveLoading, setApproveLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [profileActionLoading, setProfileActionLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -165,6 +167,50 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     }
   };
 
+  const sendOnboarding = async () => {
+    setOnboardingLoading(true);
+    try {
+      await api.patch(`/admin/advisor-applications/${id}/onboarding`, {});
+      toast.success("Onboarding email sent");
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed";
+      toast.error(msg);
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const approveProfile = async () => {
+    setProfileActionLoading(true);
+    try {
+      await api.patch(`/admin/advisor-applications/${id}/profile/approve`, {});
+      toast.success("Advisor profile approved");
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed";
+      toast.error(msg);
+    } finally {
+      setProfileActionLoading(false);
+    }
+  };
+
+  const rejectProfile = async () => {
+    const reason = window.prompt("Why was this profile rejected? What needs to be corrected?");
+    if (!reason?.trim()) return;
+    setProfileActionLoading(true);
+    try {
+      await api.patch(`/admin/advisor-applications/${id}/profile/reject`, { reason });
+      toast.success("Advisor profile rejected");
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed";
+      toast.error(msg);
+    } finally {
+      setProfileActionLoading(false);
+    }
+  };
+
   return (
     <>
       <Topbar />
@@ -224,9 +270,10 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                           onChange={(e) => updateStatus(e.target.value)}
                           disabled={statusLoading || approveLoading || rejectLoading}
                         >
-                          <option value="new">New</option>
+                          <option value="new">Application</option>
+                          <option value="pending_review">Pending Review</option>
+                          <option value="live_interview">Live Interview</option>
                           <option value="under_review">Under Review</option>
-                          <option value="interview_pending">Interview</option>
                         </select>
                       </label>
                     </div>
@@ -319,6 +366,29 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   >
                     Send Contract Via mail <span>›</span>
                   </button>
+                  <Button
+                    onClick={sendOnboarding}
+                    loading={onboardingLoading}
+                    className="w-full"
+                  >
+                    Onboarding
+                  </Button>
+                  <Button
+                    variant="success"
+                    onClick={approveProfile}
+                    loading={profileActionLoading}
+                    className="w-full"
+                  >
+                    Approve Advisor Profile
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={rejectProfile}
+                    loading={profileActionLoading}
+                    className="w-full"
+                  >
+                    Reject Advisor Profile
+                  </Button>
                   <Button
                     variant="success"
                     onClick={() => setConfirmApprove(true)}
@@ -570,10 +640,9 @@ function ChipsField({ label, items }: { label: string; items: string[] }) {
 }
 
 function toApplicationStatusValue(data: AdvisorApplication) {
+  if (data.status === "pending_review") return "pending_review";
+  if (data.status === "live_interview" || data.status === "scheduled") return "live_interview";
   if (data.status === "under_review") return "under_review";
-  if (data.stage === "pre_recorded_interview" || data.stage === "live_interview") {
-    return "interview_pending";
-  }
   return "new";
 }
 

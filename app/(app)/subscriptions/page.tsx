@@ -37,6 +37,7 @@ export default function SubscriptionsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [manageCurrencies, setManageCurrencies] = useState(false);
   const [revPeriod, setRevPeriod] = useState<RevenuePeriod>("month");
+  const [q, setQ] = useState("");
 
   const bulk = useBulkSelection(plans);
 
@@ -44,7 +45,7 @@ export default function SubscriptionsPage() {
     setLoading(true);
     try {
       const [p, s, c] = await Promise.all([
-        api.get<Plan[]>("/admin/subscriptions/plans"),
+        api.get<Plan[]>("/admin/subscriptions/plans", { q: q || undefined }),
         api.get<SubscriptionStats>("/admin/subscriptions/stats"),
         api.get<Currency[]>("/admin/currencies"),
       ]);
@@ -62,7 +63,7 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [q]);
 
   const submitDelete = async () => {
     if (!deleteConfirm) return;
@@ -118,7 +119,10 @@ export default function SubscriptionsPage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search plans by name, audience, or benefit ..."
+        onSearch={setQ}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Subscription Plans"

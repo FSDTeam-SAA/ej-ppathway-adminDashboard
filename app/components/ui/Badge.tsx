@@ -61,6 +61,8 @@ export function StatusBadge({ status }: { status?: string | null }) {
     disputed: { tone: "warning", label: "Disputed" },
     live: { tone: "info", label: "Live" },
     new: { tone: "info", label: "New" },
+    pending_review: { tone: "warning", label: "Pending Review" },
+    live_interview: { tone: "info", label: "Live Interview" },
     under_review: { tone: "warning", label: "Under Review" },
     interview_pending: { tone: "warning", label: "Interview Pending" },
     scheduled: { tone: "info", label: "Scheduled" },

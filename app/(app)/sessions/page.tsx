@@ -47,6 +47,7 @@ export default function SessionsPage() {
   const toast = useToast();
   const [items, setItems] = useState<SessionItem[]>([]);
   const [tab, setTab] = useState("live");
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -63,7 +64,12 @@ export default function SessionsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await api.get<SessionItem[]>("/admin/sessions", { tab, page, limit });
+      const r = await api.get<SessionItem[]>("/admin/sessions", {
+        tab,
+        page,
+        limit,
+        q: q || undefined,
+      });
       setItems(r.data || []);
       const m = (r.meta || {}) as ListMeta;
       setTotal(m.total || 0);
@@ -101,13 +107,13 @@ export default function SessionsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit]);
+  }, [tab, page, limit, q]);
 
   const cancelSession = async () => {
     if (!confirmCancel) return;
     setActionLoading(true);
     try {
-      await api.post(`/admin/sessions/${confirmCancel._id}/cancel`, { refundUser: true });
+      await api.patch(`/admin/sessions/${confirmCancel._id}/cancel`, { refundUser: true });
       toast.success("Session cancelled");
       setConfirmCancel(null);
       load();
@@ -121,7 +127,7 @@ export default function SessionsPage() {
 
   const resolveDisputed = async (s: SessionItem) => {
     try {
-      await api.post(`/admin/sessions/${s._id}/resolve`, {});
+      await api.patch(`/admin/sessions/${s._id}/resolve`, {});
       toast.success("Resolved");
       load();
     } catch (err) {
@@ -132,7 +138,13 @@ export default function SessionsPage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search sessions by ID, client, or advisor ..."
+        onSearch={(value) => {
+          setPage(1);
+          setQ(value);
+        }}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Session Management"

@@ -36,6 +36,7 @@ export default function AdvisorsPage() {
   useCurrencyCatalog();
   const [items, setItems] = useState<AdvisorListItem[]>([]);
   const [tab, setTab] = useState("all");
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -57,6 +58,7 @@ export default function AdvisorsPage() {
         page,
         limit,
         status: tab === "all" ? undefined : tab,
+        q: q || undefined,
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
@@ -89,7 +91,7 @@ export default function AdvisorsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit]);
+  }, [tab, page, limit, q]);
 
   const handleSuspend = async () => {
     if (!confirm) return;
@@ -111,7 +113,13 @@ export default function AdvisorsPage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search advisors by name or email ..."
+        onSearch={(value) => {
+          setPage(1);
+          setQ(value);
+        }}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Advisors Management"

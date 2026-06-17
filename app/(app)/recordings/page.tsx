@@ -31,6 +31,7 @@ export default function RecordingsPage() {
   const toast = useToast();
   const [items, setItems] = useState<SessionItem[]>([]);
   const [type, setType] = useState<TabValue>("all");
+  const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
   const [total, setTotal] = useState(0);
@@ -43,6 +44,7 @@ export default function RecordingsPage() {
     try {
       const query: Record<string, string | number> = { page, limit };
       if (type !== "all") query.type = type;
+      if (q) query.q = q;
       const r = await api.get<SessionItem[]>("/admin/sessions/recordings", query);
       setItems(r.data || []);
       const m = (r.meta || {}) as { total?: number };
@@ -52,7 +54,7 @@ export default function RecordingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, type, toast]);
+  }, [page, limit, type, q, toast]);
 
   useEffect(() => {
     load();
@@ -60,7 +62,13 @@ export default function RecordingsPage() {
 
   return (
     <>
-      <Topbar />
+      <Topbar
+        searchPlaceholder="Search recordings by session, client, or advisor ..."
+        onSearch={(value) => {
+          setPage(1);
+          setQ(value);
+        }}
+      />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Session Recordings"
