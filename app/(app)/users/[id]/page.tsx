@@ -225,6 +225,9 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                   <Field label="Joined" value={formatDate(data.user.createdAt)} />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
+                  <Button variant="outline" onClick={() => router.push(`/chats?user=${id}`)}>
+                    <ChatIcon size={16} /> Send Message
+                  </Button>
                   <Button variant="outline" onClick={() => setResetOpen(true)}>
                     Reset Password
                   </Button>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Avatar } from "../../components/ui/Avatar";
@@ -16,6 +17,7 @@ import type { ChatItem } from "../../lib/types";
 export default function ChatsPage() {
   const toast = useToast();
   const { user } = useAuth();
+  const router = useRouter();
   const [items, setItems] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -43,6 +45,29 @@ export default function ChatsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
+
+  // Deep-link: when arrived via "Send Message" (/chats?user=<id>), open or create
+  // the support conversation with that user and jump straight into the thread.
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get("user");
+    if (!target) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await api.post<{ _id: string }>(`/chats/admin/with/${target}`);
+        if (!cancelled && r.data?._id) router.replace(`/chats/${r.data._id}`);
+      } catch (err) {
+        if (!cancelled)
+          toast.error(
+            err instanceof ApiError ? err.message : "Could not open conversation",
+          );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Realtime: refresh list ordering/unread badges when any conversation gets a
   // new message. Falls back to polling every 4s if the socket can't connect.

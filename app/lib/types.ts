@@ -226,6 +226,14 @@ export interface AdvisorApplication {
     signedPdfUrl?: string;
   };
   rejectionReason?: string;
+  lastNotification?: {
+    action?: string;
+    subject?: string;
+    success?: boolean;
+    skipped?: boolean;
+    error?: string;
+    sentAt?: string;
+  };
   applicantDetails?: {
     dateOfBirth?: string;
     address?: string;

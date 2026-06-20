@@ -157,9 +157,7 @@ export default function RecordingsPage() {
                           {formatDate(s.endedAt || s.createdAt, true)}
                         </td>
                         <td className="px-5 py-3 text-slate-600">
-                          {isChat
-                            ? `${s.messageCount ?? 0} msgs`
-                            : formatDuration(s.actualDurationSec)}
+                          {formatDuration(s.actualDurationSec)}
                         </td>
                         <td className="px-5 py-3">
                           <StatusBadge status={s.status} />

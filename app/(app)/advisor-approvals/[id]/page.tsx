@@ -404,6 +404,34 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     ✕ Not Selected
                   </Button>
                 </div>
+                {data.lastNotification?.sentAt && (
+                  <div
+                    className={`mt-4 rounded-lg border px-3 py-2.5 text-xs ${
+                      data.lastNotification.success
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : data.lastNotification.skipped
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-red-200 bg-red-50 text-red-700"
+                    }`}
+                  >
+                    <div className="font-semibold">
+                      {data.lastNotification.success
+                        ? "✓ Notification email sent"
+                        : data.lastNotification.skipped
+                          ? "Email skipped — SMTP not configured"
+                          : "⚠ Notification email failed"}
+                    </div>
+                    <div className="mt-0.5 opacity-90">
+                      {data.lastNotification.subject}
+                      {data.lastNotification.sentAt
+                        ? ` · ${formatDate(data.lastNotification.sentAt, true)}`
+                        : ""}
+                    </div>
+                    {data.lastNotification.error ? (
+                      <div className="mt-0.5 opacity-80">{data.lastNotification.error}</div>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               {data.contract ? (

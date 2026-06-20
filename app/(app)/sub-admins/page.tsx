@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { Pagination } from "../../components/ui/Pagination";
@@ -728,6 +729,13 @@ function SubAdminDetailsModal({
                         onChange={(e) => setToDate(e.target.value)}
                         className="h-8 px-2 rounded-lg border border-slate-200 text-xs"
                       />
+                      <button
+                        type="button"
+                        onClick={loadActivity}
+                        className="h-8 px-3 rounded-lg bg-[#0a7a90] text-white text-xs font-medium hover:bg-[#076377]"
+                      >
+                        Search
+                      </button>
                     </div>
                   </div>
                   <div className="border border-slate-100 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
@@ -781,6 +789,9 @@ function SubAdminDetailsModal({
                   <Button variant="outline" onClick={resetPassword} loading={actionLoading}>
                     Password Reset
                   </Button>
+                  <Link href={`/chats?user=${subAdminId}`}>
+                    <Button variant="outline">Send Message</Button>
+                  </Link>
                   <Button
                     variant={data.status === "suspended" ? "primary" : "danger"}
                     onClick={suspendToggle}
