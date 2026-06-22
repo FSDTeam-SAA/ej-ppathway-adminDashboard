@@ -180,7 +180,7 @@ export default function AdvisorsPage() {
                       const rating = it.profile?.avgRating;
                       const price = it.profile?.pricing?.videoPerMin || it.profile?.pricing?.callPerMin || it.profile?.pricing?.chatPerMin;
                       const sessions = it.profile?.totalSessions || 0;
-                      const tier = it.profile?.tier === "bronze" ? "silver" : it.profile?.tier || "silver";
+                      const tier = ["silver", "gold", "platinum"].includes(it.profile?.tier ?? "") ? (it.profile!.tier as string) : "silver";
                       const selected = bulk.isSelected(it.user._id);
                       return (
                         <tr

@@ -162,8 +162,8 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-slate-900">{u.name}</h2>
                     <StatusBadge status={u.status} />
-                    <Badge tone={((p?.tier === "bronze" ? "silver" : p?.tier) as "silver" | "gold" | "platinum") || "silver"}>
-                      {TIER_OPTIONS.find((t) => t.value === (p?.tier === "bronze" ? "silver" : p?.tier || "silver"))?.label}
+                    <Badge tone={(["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver") as "silver" | "gold" | "platinum"}>
+                      {TIER_OPTIONS.find((t) => t.value === (["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver"))?.label}
                     </Badge>
                     {m?.availability.availableNow && (
                       <Badge tone="success">â— Available Now</Badge>
@@ -218,7 +218,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                 <Field label="City" value={u.city || "â€”"} />
                 <Field label="Time Zone" value={u.timezone || "â€”"} />
                 <Field label="Account Status" value={<StatusBadge status={u.status} />} />
-                <Field label="Tier Rank" value={<span className="capitalize">{p?.tier === "bronze" ? "silver" : p?.tier || "silver"}</span>} />
+                <Field label="Tier Rank" value={<span className="capitalize">{["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver"}</span>} />
                 <Field
                   label="Rating"
                   value={
@@ -355,7 +355,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                 <div className="inline-flex items-center gap-2">
                   <Award size={16} className="text-slate-500" />
                   <select
-                    value={p?.tier === "bronze" ? "silver" : p?.tier || "silver"}
+                    value={["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver"}
                     onChange={(e) => changeTier(e.target.value)}
                     disabled={actionLoading}
                     className="h-10 rounded-xl border border-slate-200 px-3 text-sm bg-white"
@@ -562,7 +562,7 @@ function EditAdvisorModal({
     city: user.city || "",
     timezone: user.timezone || "",
     professionalTitle: profile?.professionalTitle || "",
-    tier: profile?.tier === "bronze" ? "silver" : profile?.tier || "silver",
+    tier: ["silver", "gold", "platinum"].includes(profile?.tier ?? "") ? (profile!.tier as string) : "silver",
     expertise: (profile?.expertise || []).join(", "),
     styles: (profile?.styles || []).join(", "),
     languages: (profile?.languages || []).join(", "),
