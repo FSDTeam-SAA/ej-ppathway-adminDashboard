@@ -138,7 +138,7 @@ export interface AdvisorProfile {
   pricing?: AdvisorPricing;
   avgRating?: number;
   ratingsCount?: number;
-  tier?: "bronze" | "silver" | "gold";
+  tier?: "silver" | "gold" | "platinum";
   totalSessions?: number;
   earnings?: number;
   retentionRate?: number;
@@ -538,7 +538,7 @@ export interface FinanceOverview {
 
 export interface AdvisorEarning {
   advisor: { _id: string; name: string; email?: string; profilePhoto?: string } | null;
-  tier: "bronze" | "silver" | "gold";
+  tier: "silver" | "gold" | "platinum";
   totalSessions: number;
   grossEarnings: number;
   platformCommission: number;
@@ -547,9 +547,9 @@ export interface AdvisorEarning {
 }
 
 export interface Commissions {
-  bronze: number;
   silver: number;
   gold: number;
+  platinum: number;
 }
 
 export interface PlanPerformance {

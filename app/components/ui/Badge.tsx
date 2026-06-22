@@ -7,6 +7,7 @@ type Tone =
   | "bronze"
   | "silver"
   | "gold"
+  | "platinum"
   | "premium"
   | "basic"
   | "free";
@@ -20,6 +21,7 @@ const tones: Record<Tone, string> = {
   bronze: "bg-orange-100 text-orange-700",
   silver: "bg-slate-200 text-slate-700",
   gold: "bg-amber-100 text-amber-800",
+  platinum: "bg-cyan-100 text-cyan-800",
   premium: "bg-purple-100 text-purple-700",
   basic: "bg-sky-100 text-sky-700",
   free: "bg-amber-100 text-amber-700",
@@ -48,7 +50,7 @@ export function StatusBadge({ status }: { status?: string | null }) {
   const s = status.toLowerCase();
   const map: Record<string, { tone: Tone; label: string }> = {
     active: { tone: "success", label: "Active" },
-    suspended: { tone: "danger", label: "Suspended" },
+    suspended: { tone: "danger", label: "Deactivated" },
     deactivated: { tone: "danger", label: "Deactivated" },
     pending_verification: { tone: "warning", label: "Pending verification" },
     pending: { tone: "warning", label: "Pending" },

@@ -223,7 +223,7 @@ export default function DashboardPage() {
                   <MiniStat label="Total" value={perf?.total ?? 0} />
                   <MiniStat label="Active" value={perf?.active ?? 0} tone="emerald" />
                   <MiniStat label="Online" value={perf?.online ?? 0} tone="emerald" />
-                  <MiniStat label="Suspended" value={perf?.suspended ?? 0} tone="red" />
+                  <MiniStat label="Deactivated" value={perf?.suspended ?? 0} tone="red" />
                 </div>
                 <div className="text-xs font-medium text-slate-500 mb-2">Top Performing Advisors</div>
                 <div className="space-y-2">

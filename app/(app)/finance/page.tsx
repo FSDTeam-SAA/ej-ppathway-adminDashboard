@@ -679,7 +679,7 @@ function AdvisorEarningsTab() {
                       </td>
                       <td className="px-5 py-3">
                         <Badge tone={e.tier}>
-                          {e.tier === "gold" ? "🏅 Gold" : e.tier === "silver" ? "🥈 Silver" : "🥉 Bronze"}
+                          {e.tier === "platinum" ? "Platinum" : e.tier === "gold" ? "Gold" : "Silver"}
                         </Badge>
                       </td>
                       <td className="px-5 py-3 text-slate-700">{e.totalSessions}</td>
@@ -896,7 +896,7 @@ function PayoutsTab({ q }: { q: string }) {
 
 function CommissionsTab() {
   const toast = useToast();
-  const [comm, setComm] = useState<Commissions>({ bronze: 20, silver: 15, gold: 10 });
+  const [comm, setComm] = useState<Commissions>({ silver: 20, gold: 15, platinum: 10 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -904,7 +904,7 @@ function CommissionsTab() {
     api
       .get<Commissions>("/admin/finance/commissions")
       .then((r) => {
-        if (r.data) setComm(r.data);
+        if (r.data) setComm((current) => ({ ...current, ...r.data }));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -941,9 +941,9 @@ function CommissionsTab() {
         </div>
       ) : (
         <div className="space-y-6 max-w-3xl">
-          <Slider label={<Badge tone="bronze">🥉 Bronze</Badge>} value={comm.bronze} onChange={(v) => setComm({ ...comm, bronze: v })} />
-          <Slider label={<Badge tone="silver">🥈 Silver</Badge>} value={comm.silver} onChange={(v) => setComm({ ...comm, silver: v })} />
-          <Slider label={<Badge tone="gold">🏅 Gold</Badge>} value={comm.gold} onChange={(v) => setComm({ ...comm, gold: v })} />
+          <Slider label={<Badge tone="silver">Silver</Badge>} value={comm.silver} onChange={(v) => setComm({ ...comm, silver: v })} />
+          <Slider label={<Badge tone="gold">Gold</Badge>} value={comm.gold} onChange={(v) => setComm({ ...comm, gold: v })} />
+          <Slider label={<Badge tone="platinum">Platinum</Badge>} value={comm.platinum} onChange={(v) => setComm({ ...comm, platinum: v })} />
 
           <Button onClick={save} loading={saving}>
             Save Commissions
@@ -972,7 +972,7 @@ function Slider({
       <input
         type="range"
         min={0}
-        max={50}
+        max={100}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-[#0a7a90]"

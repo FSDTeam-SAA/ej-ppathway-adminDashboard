@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -26,7 +26,6 @@ const TABS = [
   { value: "all", label: "All" },
   { value: "active", label: "Active" },
   { value: "deactivated", label: "Deactivated" },
-  { value: "suspended", label: "Suspended" },
   { value: "online", label: "Online" },
   { value: "available_now", label: "Available Now" },
 ];
@@ -97,10 +96,10 @@ export default function AdvisorsPage() {
     if (!confirm) return;
     setConfirmLoading(true);
     try {
-      const isSuspended = confirm.user.status === "suspended";
-      const path = `/admin/advisors/${confirm.user._id}/${isSuspended ? "unsuspend" : "suspend"}`;
+      const isDeactivated = confirm.user.status === "deactivated" || confirm.user.status === "suspended";
+      const path = `/admin/advisors/${confirm.user._id}/${isDeactivated ? "unsuspend" : "suspend"}`;
       await api.patch(path, {});
-      toast.success(isSuspended ? "Advisor reactivated" : "Advisor suspended");
+      toast.success(isDeactivated ? "Advisor reactivated" : "Advisor deactivated");
       setConfirm(null);
       load();
     } catch (err) {
@@ -181,7 +180,7 @@ export default function AdvisorsPage() {
                       const rating = it.profile?.avgRating;
                       const price = it.profile?.pricing?.videoPerMin || it.profile?.pricing?.callPerMin || it.profile?.pricing?.chatPerMin;
                       const sessions = it.profile?.totalSessions || 0;
-                      const tier = it.profile?.tier || "bronze";
+                      const tier = it.profile?.tier === "bronze" ? "silver" : it.profile?.tier || "silver";
                       const selected = bulk.isSelected(it.user._id);
                       return (
                         <tr
@@ -210,12 +209,12 @@ export default function AdvisorsPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-slate-700">
-                            {price ? `${symbolFor(it.user?.currency)}${price}/min` : "—"}
+                            {price ? `${symbolFor(it.user?.currency)}${price}/min` : "â€”"}
                           </td>
                           <td className="px-5 py-3 text-slate-700">{sessions}</td>
                           <td className="px-5 py-3">
-                            <Badge tone={tier as "bronze" | "silver" | "gold"}>
-                              {tier === "gold" ? "🏅 Gold" : tier === "silver" ? "🥈 Silver" : "🥉 Bronze"}
+                            <Badge tone={tier as "silver" | "gold" | "platinum"}>
+                              {tier === "platinum" ? "Platinum" : tier === "gold" ? "Gold" : "Silver"}
                             </Badge>
                           </td>
                           <td className="px-5 py-3">
@@ -233,7 +232,7 @@ export default function AdvisorsPage() {
                               <button
                                 type="button"
                                 onClick={() => setConfirm(it)}
-                                aria-label="Suspend"
+                                aria-label="Deactivate"
                                 className="h-9 w-9 rounded-full border border-red-200 text-red-500 inline-flex items-center justify-center hover:bg-red-50"
                               >
                                 <SuspendIcon size={16} />
@@ -265,12 +264,12 @@ export default function AdvisorsPage() {
           onConfirm={handleSuspend}
           title="Are you sure?"
           description={
-            confirm?.user.status === "suspended"
+            confirm?.user.status === "deactivated" || confirm?.user.status === "suspended"
               ? "Re-activate this advisor?"
-              : "You want to Suspend this advisor from your application he can't use this account if you suspended this user."
+              : "Deactivate this advisor account. They will lose access until you reactivate them."
           }
-          confirmText={confirm?.user.status === "suspended" ? "Unsuspend" : "Suspend"}
-          danger={confirm?.user.status !== "suspended"}
+          confirmText={confirm?.user.status === "deactivated" || confirm?.user.status === "suspended" ? "Reactivate" : "Deactivate"}
+          danger={confirm?.user.status !== "deactivated" && confirm?.user.status !== "suspended"}
           loading={confirmLoading}
         />
 
@@ -344,7 +343,7 @@ function AddAdvisorModal({
     language: "",
     password: "",
     experience: "",
-    tier: "bronze",
+    tier: "silver",
     type: "",
     style: "",
     chatPerMin: "",
@@ -401,7 +400,7 @@ function AddAdvisorModal({
 
   const handleClose = () => {
     setCreated(null);
-    setForm({ name: "", email: "", phoneNumber: "", country: "", state: "", city: "", timezone: "", professionalTitle: "", language: "", password: "", experience: "", tier: "bronze", type: "", style: "", chatPerMin: "", callPerMin: "", videoPerMin: "", bio: "" });
+    setForm({ name: "", email: "", phoneNumber: "", country: "", state: "", city: "", timezone: "", professionalTitle: "", language: "", password: "", experience: "", tier: "silver", type: "", style: "", chatPerMin: "", callPerMin: "", videoPerMin: "", bio: "" });
     onClose();
   };
 
@@ -410,7 +409,7 @@ function AddAdvisorModal({
       <Modal open={open} onClose={handleClose} title="Advisor Account Created" size="md">
         <div className="space-y-4">
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
-            Account created successfully. Share these login credentials with the advisor — they can login to the Advisor Dashboard immediately.
+            Account created successfully. Share these login credentials with the advisor â€” they can login to the Advisor Dashboard immediately.
           </div>
           <CopyField label="Email" value={created.email} />
           <CopyField label="Password" value={created.password} />
@@ -455,8 +454,8 @@ function AddAdvisorModal({
             options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
             value={form.country}
             onChange={(v) => setForm((s) => ({ ...s, country: v, city: "" }))}
-            placeholder="Select country…"
-            searchPlaceholder="Search countries…"
+            placeholder="Select countryâ€¦"
+            searchPlaceholder="Search countriesâ€¦"
             emptyText="No country found."
           />
         </label>
@@ -474,8 +473,8 @@ function AddAdvisorModal({
             options={cities.map((c) => ({ value: c, label: c }))}
             value={form.city}
             onChange={(v) => onChange("city", v)}
-            placeholder={form.country ? "Select city…" : "Select a country first"}
-            searchPlaceholder="Search cities…"
+            placeholder={form.country ? "Select cityâ€¦" : "Select a country first"}
+            searchPlaceholder="Search citiesâ€¦"
             emptyText="No city found."
             disabled={!form.country}
             allowCustom
@@ -518,14 +517,14 @@ function AddAdvisorModal({
           </span>
           <Combobox
             options={[
-              { value: "bronze", label: "🥉 Bronze" },
-              { value: "silver", label: "🥈 Silver" },
-              { value: "gold", label: "🏅 Gold" },
+              { value: "silver", label: "Silver" },
+              { value: "gold", label: "Gold" },
+              { value: "platinum", label: "Platinum" },
             ]}
             value={form.tier}
             onChange={(v) => onChange("tier", v)}
-            placeholder="Select tier…"
-            searchPlaceholder="Search tiers…"
+            placeholder="Select tierâ€¦"
+            searchPlaceholder="Search tiersâ€¦"
             emptyText="No tier found."
           />
         </label>
@@ -589,3 +588,4 @@ function AddAdvisorModal({
     </Modal>
   );
 }
+

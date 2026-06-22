@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
@@ -49,9 +49,9 @@ const DAY_ORDER = [
 ];
 
 const TIER_OPTIONS = [
-  { value: "bronze", label: "🥉 Bronze" },
-  { value: "silver", label: "🥈 Silver" },
-  { value: "gold", label: "🏅 Gold" },
+  { value: "silver", label: "Silver" },
+  { value: "gold", label: "Gold" },
+  { value: "platinum", label: "Platinum" },
 ];
 
 export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -89,10 +89,10 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
     if (!data) return;
     setActionLoading(true);
     try {
-      const isSuspended = data.user.status === "suspended";
-      const path = `/admin/advisors/${id}/${isSuspended ? "unsuspend" : "suspend"}`;
+      const isDeactivated = data.user.status === "deactivated" || data.user.status === "suspended";
+      const path = `/admin/advisors/${id}/${isDeactivated ? "unsuspend" : "suspend"}`;
       await api.patch(path, {});
-      toast.success(isSuspended ? "Advisor reactivated" : "Advisor suspended");
+      toast.success(isDeactivated ? "Advisor reactivated" : "Advisor deactivated");
       setConfirmSuspend(false);
       load();
     } catch (err) {
@@ -162,11 +162,11 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-2xl font-bold text-slate-900">{u.name}</h2>
                     <StatusBadge status={u.status} />
-                    <Badge tone={(p?.tier as "bronze" | "silver" | "gold") || "bronze"}>
-                      {TIER_OPTIONS.find((t) => t.value === (p?.tier || "bronze"))?.label}
+                    <Badge tone={((p?.tier === "bronze" ? "silver" : p?.tier) as "silver" | "gold" | "platinum") || "silver"}>
+                      {TIER_OPTIONS.find((t) => t.value === (p?.tier === "bronze" ? "silver" : p?.tier || "silver"))?.label}
                     </Badge>
                     {m?.availability.availableNow && (
-                      <Badge tone="success">● Available Now</Badge>
+                      <Badge tone="success">â— Available Now</Badge>
                     )}
                   </div>
                   <p className="text-slate-500 mt-0.5">
@@ -175,7 +175,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-500">
                     <span className="inline-flex items-center gap-1">
                       <MapPin size={14} />
-                      {formatLocation(u.city, countryName(u.country)) || "—"}
+                      {formatLocation(u.city, countryName(u.country)) || "â€”"}
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <StarIcon size={14} filled />
@@ -209,16 +209,16 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                         {u.phone}
                       </span>
                     ) : (
-                      "—"
+                      "â€”"
                     )
                   }
                 />
-                <Field label="Country" value={countryName(u.country) || "—"} />
-                <Field label="State / Region" value={u.state || "—"} />
-                <Field label="City" value={u.city || "—"} />
-                <Field label="Time Zone" value={u.timezone || "—"} />
+                <Field label="Country" value={countryName(u.country) || "â€”"} />
+                <Field label="State / Region" value={u.state || "â€”"} />
+                <Field label="City" value={u.city || "â€”"} />
+                <Field label="Time Zone" value={u.timezone || "â€”"} />
                 <Field label="Account Status" value={<StatusBadge status={u.status} />} />
-                <Field label="Tier Rank" value={<span className="capitalize">{p?.tier || "bronze"}</span>} />
+                <Field label="Tier Rank" value={<span className="capitalize">{p?.tier === "bronze" ? "silver" : p?.tier || "silver"}</span>} />
                 <Field
                   label="Rating"
                   value={
@@ -233,17 +233,17 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   value={
                     <span className="text-slate-700">
                       {sym}
-                      {pricing?.chatPerMin ?? 0} chat · {sym}
-                      {pricing?.callPerMin ?? 0} call · {sym}
+                      {pricing?.chatPerMin ?? 0} chat Â· {sym}
+                      {pricing?.callPerMin ?? 0} call Â· {sym}
                       {pricing?.videoPerMin ?? 0} video
                     </span>
                   }
                 />
                 <Field label="Date Joined" value={formatDate(u.createdAt)} />
-                <Field label="Last Login" value={u.lastLoginAt ? formatRelative(u.lastLoginAt) : "—"} />
+                <Field label="Last Login" value={u.lastLoginAt ? formatRelative(u.lastLoginAt) : "â€”"} />
                 <Field
                   label="Last Active"
-                  value={p?.lastSeenAt ? formatRelative(p.lastSeenAt) : "—"}
+                  value={p?.lastSeenAt ? formatRelative(p.lastSeenAt) : "â€”"}
                 />
               </div>
 
@@ -335,7 +335,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                       <span className="capitalize text-slate-700">{day}</span>
                       {enabled ? (
                         <span className="text-[#0a7a90] font-medium">
-                          {slot?.from || "—"} - {slot?.to || "—"}
+                          {slot?.from || "â€”"} - {slot?.to || "â€”"}
                         </span>
                       ) : (
                         <span className="text-slate-400 text-sm">Unavailable</span>
@@ -355,7 +355,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                 <div className="inline-flex items-center gap-2">
                   <Award size={16} className="text-slate-500" />
                   <select
-                    value={p?.tier || "bronze"}
+                    value={p?.tier === "bronze" ? "silver" : p?.tier || "silver"}
                     onChange={(e) => changeTier(e.target.value)}
                     disabled={actionLoading}
                     className="h-10 rounded-xl border border-slate-200 px-3 text-sm bg-white"
@@ -376,10 +376,10 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   <KeyRound size={16} /> Reset Password
                 </Button>
                 <Button
-                  variant={u.status === "suspended" ? "primary" : "danger"}
+                  variant={u.status === "deactivated" || u.status === "suspended" ? "primary" : "danger"}
                   onClick={() => setConfirmSuspend(true)}
                 >
-                  {u.status === "suspended" ? "Reactivate Advisor" : "Suspend Advisor"}
+                  {u.status === "deactivated" || u.status === "suspended" ? "Reactivate Advisor" : "Deactivate Advisor"}
                 </Button>
               </div>
             </Section>
@@ -393,12 +393,12 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
         onConfirm={suspendToggle}
         title="Are you sure?"
         description={
-          data?.user.status === "suspended"
+          data?.user.status === "deactivated" || data?.user.status === "suspended"
             ? "Re-activate this advisor?"
-            : "You want to Suspend this advisor. They will lose access until you re-activate them."
+            : "Deactivate this advisor. They will lose access until you reactivate them."
         }
-        confirmText={data?.user.status === "suspended" ? "Reactivate" : "Suspend"}
-        danger={data?.user.status !== "suspended"}
+        confirmText={data?.user.status === "deactivated" || data?.user.status === "suspended" ? "Reactivate" : "Deactivate"}
+        danger={data?.user.status !== "deactivated" && data?.user.status !== "suspended"}
         loading={actionLoading}
       />
 
@@ -472,7 +472,7 @@ function TagBlock({
             </Badge>
           ))
         ) : (
-          <span className="text-sm text-slate-400">—</span>
+          <span className="text-sm text-slate-400">â€”</span>
         )}
       </div>
     </div>
@@ -562,7 +562,7 @@ function EditAdvisorModal({
     city: user.city || "",
     timezone: user.timezone || "",
     professionalTitle: profile?.professionalTitle || "",
-    tier: profile?.tier || "bronze",
+    tier: profile?.tier === "bronze" ? "silver" : profile?.tier || "silver",
     expertise: (profile?.expertise || []).join(", "),
     styles: (profile?.styles || []).join(", "),
     languages: (profile?.languages || []).join(", "),
@@ -625,8 +625,8 @@ function EditAdvisorModal({
             options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
             value={form.country}
             onChange={(v) => setForm((s) => ({ ...s, country: v, city: "" }))}
-            placeholder="Select country…"
-            searchPlaceholder="Search countries…"
+            placeholder="Select countryâ€¦"
+            searchPlaceholder="Search countriesâ€¦"
             emptyText="No country found."
           />
         </label>
@@ -641,8 +641,8 @@ function EditAdvisorModal({
             options={cities.map((c) => ({ value: c, label: c }))}
             value={form.city}
             onChange={(v) => onChange("city", v)}
-            placeholder={form.country ? "Select city…" : "Select a country first"}
-            searchPlaceholder="Search cities…"
+            placeholder={form.country ? "Select cityâ€¦" : "Select a country first"}
+            searchPlaceholder="Search citiesâ€¦"
             emptyText="No city found."
             disabled={!form.country}
             allowCustom
@@ -665,8 +665,8 @@ function EditAdvisorModal({
             options={TIER_OPTIONS}
             value={form.tier}
             onChange={(v) => onChange("tier", v)}
-            placeholder="Select tier…"
-            searchPlaceholder="Search tiers…"
+            placeholder="Select tierâ€¦"
+            searchPlaceholder="Search tiersâ€¦"
             emptyText="No tier found."
           />
         </label>
@@ -719,7 +719,7 @@ function EditAdvisorModal({
           label="Bio / About the Advisor"
           value={form.detailedDescription}
           onChange={(e) => onChange("detailedDescription", e.target.value)}
-          placeholder="Detailed description…"
+          placeholder="Detailed descriptionâ€¦"
         />
       </div>
 
@@ -734,3 +734,4 @@ function EditAdvisorModal({
     </Modal>
   );
 }
+
