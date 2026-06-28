@@ -18,6 +18,8 @@ import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
 import type { UserDetailsResponse } from "../../../lib/types";
 import { DollarIcon, CallIcon, ChatIcon, VideoIcon } from "../../../components/Icons";
 
+const formatCredits = (value?: number | null) => `${Number(value || 0).toLocaleString()} credits`;
+
 export default function UserDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -62,7 +64,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
     setCreditsLoading(true);
     try {
       await api.post(`/admin/users/${id}/credits`, { amount });
-      toast.success(`Added $${amount} in credits`);
+      toast.success(`Added ${amount} free credits`);
       setCreditsOpen(false);
       setCreditsAmount("");
       load();
@@ -171,7 +173,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                   }
                 />
                 <Field label="Joined" value={formatDate(data.user.createdAt)} />
-                <Field label="Total Spent" value={formatCurrency(data.totalSpent)} />
+                <Field label="Credits Used" value={formatCredits(data.totalSpent)} />
                 <Field label="Total Sessions" value={`${data.sessionsCount ?? 0}`} />
                 <Field label="Plan" value={getPlanName(data.activeSubscription)} />
               </div>
@@ -181,12 +183,12 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
               <div>
                 <h3 className="text-emerald-800 font-semibold">Free Credits Balance</h3>
                 <p className="text-emerald-700/80 text-sm">
-                  Credits can be used for sessions beyond plan limits
+                  Credits can be used for sessions and add-ons
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-2xl font-bold text-emerald-900">
-                  {formatCurrency(data.wallet?.freeCredits)}
+                  {formatCredits(data.wallet?.freeCredits)}
                 </span>
                 <Button variant="success" onClick={() => setCreditsOpen(true)}>
                   <DollarIcon size={16} /> Give Free Credits
@@ -196,12 +198,12 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <section className="bg-[#e6f2f6]/40 rounded-xl p-5">
-                <h3 className="font-semibold text-slate-900 mb-4">Billing & Subscription Summary</h3>
+                <h3 className="font-semibold text-slate-900 mb-4">Credits Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Active Plan" value={getPlanName(data.activeSubscription)} />
-                  <Field label="Wallet Balance" value={formatCurrency(data.wallet?.balance)} />
-                  <Field label="Free Credits" value={formatCurrency(data.wallet?.freeCredits)} />
-                  <Field label="Total Spent" value={formatCurrency(data.totalSpent)} />
+                  <Field label="Purchased Credits" value={formatCredits(data.wallet?.balance)} />
+                  <Field label="Free Credits" value={formatCredits(data.wallet?.freeCredits)} />
+                  <Field label="Credits Used" value={formatCredits(data.totalSpent)} />
+                  <Field label="Legacy Plan" value={getPlanName(data.activeSubscription)} />
                 </div>
                 <div className="mt-4 space-y-2">
                   {(data.subscriptions || []).slice(0, 3).map((s) => (
@@ -337,11 +339,10 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
         <p className="text-sm mb-3">
           <span className="text-slate-600">Current Balance: </span>
           <span className="text-emerald-700 font-semibold">
-            {formatCurrency(data?.wallet?.freeCredits)}
+            {formatCredits(data?.wallet?.freeCredits)}
           </span>
         </p>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
           <input
             type="number"
             min="1"
@@ -349,7 +350,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
             placeholder="Enter credit amount"
             value={creditsAmount}
             onChange={(e) => setCreditsAmount(e.target.value)}
-            className="w-full h-11 pl-8 pr-4 rounded-lg bg-[#e6f2f6]/60 border border-transparent focus:border-[#0a7a90] focus:bg-white"
+            className="w-full h-11 px-4 rounded-lg bg-[#e6f2f6]/60 border border-transparent focus:border-[#0a7a90] focus:bg-white"
           />
         </div>
         <div className="grid grid-cols-2 gap-3 mt-5">

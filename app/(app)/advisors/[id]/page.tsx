@@ -28,7 +28,6 @@ import {
   Award,
 } from "lucide-react";
 import { useCountries, useCities, useCountryName, formatLocation } from "../../../lib/countries";
-import { useCurrencyCatalog, symbolFor } from "../../../lib/currency";
 
 type AdvisorDetailsResponse = {
   user: AdminUser;
@@ -59,7 +58,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const toast = useToast();
   const countryName = useCountryName();
-  useCurrencyCatalog();
   const [data, setData] = useState<AdvisorDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
@@ -120,7 +118,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const u = data?.user;
   const p = data?.profile;
   const m = data?.metrics;
-  const sym = symbolFor(u?.currency);
   const pricing = p?.pricing;
   const schedule = m?.availability.weeklySchedule || p?.weeklySchedule || null;
 
@@ -232,10 +229,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   label="Price Per Min"
                   value={
                     <span className="text-slate-700">
-                      {sym}
-                      {pricing?.chatPerMin ?? 0} chat Â· {sym}
-                      {pricing?.callPerMin ?? 0} call Â· {sym}
-                      {pricing?.videoPerMin ?? 0} video
+                      {pricing?.chatPerMin ?? 0} chat credits/min Â· {pricing?.callPerMin ?? 0} call credits/min Â· {pricing?.videoPerMin ?? 0} video credits/min
                     </span>
                   }
                 />
@@ -691,22 +685,22 @@ function EditAdvisorModal({
       </div>
 
       <div className="mt-5">
-        <p className="text-sm font-semibold text-slate-700 mb-2">Price Per Minute</p>
+        <p className="text-sm font-semibold text-slate-700 mb-2">Credits Per Minute</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input
-            label="Chat ($/min)"
+            label="Chat (credits/min)"
             type="number"
             value={form.chatPerMin}
             onChange={(e) => onChange("chatPerMin", e.target.value)}
           />
           <Input
-            label="Call ($/min)"
+            label="Call (credits/min)"
             type="number"
             value={form.callPerMin}
             onChange={(e) => onChange("callPerMin", e.target.value)}
           />
           <Input
-            label="Video ($/min)"
+            label="Video (credits/min)"
             type="number"
             value={form.videoPerMin}
             onChange={(e) => onChange("videoPerMin", e.target.value)}
@@ -734,4 +728,3 @@ function EditAdvisorModal({
     </Modal>
   );
 }
-

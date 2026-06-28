@@ -24,7 +24,7 @@ import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
-import { formatCurrency, formatDate, formatDuration } from "../../lib/format";
+import { formatDate, formatDuration } from "../../lib/format";
 import { MiniArea } from "../../components/charts";
 import type { SessionItem } from "../../lib/types";
 
@@ -192,7 +192,7 @@ export default function SessionsPage() {
                     <th className="px-5 py-4 font-medium">Advisor</th>
                     <th className="px-5 py-4 font-medium">Type</th>
                     <th className="px-5 py-4 font-medium">Duration</th>
-                    <th className="px-5 py-4 font-medium">Amount</th>
+                    <th className="px-5 py-4 font-medium">Credits</th>
                     <th className="px-5 py-4 font-medium">Status</th>
                     <th className="px-5 py-4 font-medium text-right">Action</th>
                   </tr>
@@ -240,8 +240,8 @@ export default function SessionsPage() {
                             {sessionIcon(s.type)} {sessionTypeLabel(s.type)}
                           </span>
                         </td>
-                        <td className="px-5 py-3">{formatDuration(s.duration)}</td>
-                        <td className="px-5 py-3">{formatCurrency(s.chargedAmount)}</td>
+                        <td className="px-5 py-3">{formatDuration(sessionDurationSeconds(s))}</td>
+                        <td className="px-5 py-3">{formatCredits(s.creditsUsed ?? s.chargedAmount)}</td>
                         <td className="px-5 py-3">
                           <StatusBadge status={s.status} />
                         </td>
@@ -308,8 +308,8 @@ export default function SessionsPage() {
                 <Field label="Client Name" value={details.user?.name || "—"} />
                 <Field label="Advisor Name" value={details.advisor?.name || "—"} />
                 <Field label="Session Type" value={sessionTypeLabel(details.type)} />
-                <Field label="Session Duration" value={formatDuration(details.duration)} />
-                <Field label="Session Amount" value={formatCurrency(details.chargedAmount)} />
+                <Field label="Session Duration" value={formatDuration(sessionDurationSeconds(details))} />
+                <Field label="Session Credits" value={formatCredits(details.creditsUsed ?? details.chargedAmount)} />
                 <Field label="Session Status" value={details.status || "—"} />
                 <Field label="Session Date & Time" value={formatDate(details.createdAt, true)} />
               </div>
@@ -414,6 +414,20 @@ function sessionIcon(type?: string) {
   if (type === "call") return <CallIcon className="text-emerald-600" size={16} />;
   return <ChatIcon className="text-slate-600" size={16} />;
 }
+
+function formatCredits(value?: number) {
+  if (typeof value !== "number") return "-";
+  const formatted = Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return `${formatted} credits`;
+}
+
+function sessionDurationSeconds(session: SessionItem) {
+  if (typeof session.actualDurationSec === "number") return session.actualDurationSec;
+  if (typeof session.duration === "number") return session.duration;
+  if (typeof session.durationMinutes === "number") return session.durationMinutes * 60;
+  return undefined;
+}
+
 function sessionTypeLabel(type?: string) {
   if (type === "video") return "Video";
   if (type === "call") return "Call";

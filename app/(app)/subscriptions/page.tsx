@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
 import { CardSkeleton } from "../../components/Skeleton";
@@ -25,6 +26,14 @@ const monthLabels = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SE
 type RevenuePeriod = "today" | "week" | "month" | "year";
 
 export default function SubscriptionsPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/settings");
+  }, [router]);
+
+  return null;
+
   const toast = useToast();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [stats, setStats] = useState<SubscriptionStats | null>(null);
@@ -175,7 +184,7 @@ export default function SubscriptionsPage() {
             value={perf?.mostPopular?.plan || "—"}
             icon={<CrownIcon />}
             color="#0a7a90"
-            note={perf?.mostPopular ? `${perf.mostPopular.total} subscribers` : undefined}
+            note={perf?.mostPopular ? `${perf?.mostPopular?.total} subscribers` : undefined}
           />
         </div>
 

@@ -19,7 +19,6 @@ import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { useCountries, useCities } from "../../lib/countries";
-import { useCurrencyCatalog, symbolFor } from "../../lib/currency";
 import type { AdvisorListItem } from "../../lib/types";
 
 const TABS = [
@@ -32,7 +31,6 @@ const TABS = [
 
 export default function AdvisorsPage() {
   const toast = useToast();
-  useCurrencyCatalog();
   const [items, setItems] = useState<AdvisorListItem[]>([]);
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
@@ -161,7 +159,7 @@ export default function AdvisorsPage() {
                     </th>
                     <th className="px-5 py-4 font-semibold">Advisor</th>
                     <th className="px-5 py-4 font-semibold">Ratings</th>
-                    <th className="px-5 py-4 font-semibold">Price</th>
+                    <th className="px-5 py-4 font-semibold">Credit Rate</th>
                     <th className="px-5 py-4 font-semibold">Sessions</th>
                     <th className="px-5 py-4 font-semibold">Tier</th>
                     <th className="px-5 py-4 font-semibold">Status</th>
@@ -209,7 +207,7 @@ export default function AdvisorsPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-slate-700">
-                            {price ? `${symbolFor(it.user?.currency)}${price}/min` : "â€”"}
+                            {price ? `${Number(price).toFixed(2)} credits/min` : "â€”"}
                           </td>
                           <td className="px-5 py-3 text-slate-700">{sessions}</td>
                           <td className="px-5 py-3">
@@ -543,28 +541,28 @@ function AddAdvisorModal({
       </div>
 
       <div className="mt-5">
-        <p className="text-sm font-semibold text-slate-700 mb-2">Price Per Minute</p>
+        <p className="text-sm font-semibold text-slate-700 mb-2">Credits Per Minute</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input
-            label="Chat ($/min)"
+            label="Chat (credits/min)"
             type="number"
             value={form.chatPerMin}
             onChange={(e) => onChange("chatPerMin", e.target.value)}
-            placeholder="e.g. 1.00"
+            placeholder="e.g. 0.33"
           />
           <Input
-            label="Call ($/min)"
+            label="Call (credits/min)"
             type="number"
             value={form.callPerMin}
             onChange={(e) => onChange("callPerMin", e.target.value)}
-            placeholder="e.g. 1.20"
+            placeholder="e.g. 1.00"
           />
           <Input
-            label="Video ($/min)"
+            label="Video (credits/min)"
             type="number"
             value={form.videoPerMin}
             onChange={(e) => onChange("videoPerMin", e.target.value)}
-            placeholder="e.g. 1.50"
+            placeholder="e.g. 1.33"
           />
         </div>
       </div>

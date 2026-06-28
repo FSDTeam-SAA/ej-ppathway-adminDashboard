@@ -260,10 +260,12 @@ export interface SessionItem {
     | "flagged"
     | "no_show";
   duration?: number;
+  durationMinutes?: number;
   actualDurationSec?: number;
   startedAt?: string;
   endedAt?: string;
   chargedAmount?: number;
+  creditsUsed?: number;
   refundIssued?: number;
   cancelReason?: string;
   cancelledAt?: string;

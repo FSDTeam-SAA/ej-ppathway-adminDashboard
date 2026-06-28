@@ -299,6 +299,9 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     label="Country"
                     value={countryName(data.applicantDetails?.country) || data.applicantDetails?.country || "â€”"}
                   />
+                  <Field label="Chat Per Min" value={formatPrice(data.pricing?.chatPerMin)} />
+                  <Field label="Call Per Min" value={formatPrice(data.pricing?.callPerMin)} />
+                  <Field label="Video Per Min" value={formatPrice(data.pricing?.videoPerMin)} />
                 </div>
               </div>
 
@@ -679,5 +682,9 @@ function yesNoLabel(value?: string) {
   if (value.toLowerCase() === "yes") return "Yes";
   if (value.toLowerCase() === "no") return "No";
   return value;
+}
+
+function formatPrice(value?: number) {
+  return typeof value === "number" ? String(value) : "-";
 }
 

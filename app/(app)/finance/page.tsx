@@ -344,7 +344,7 @@ function TransactionsTab({
                   <th className="px-5 py-4 font-medium">User</th>
                   <th className="px-5 py-4 font-medium">Transaction ID</th>
                   <th className="px-5 py-4 font-medium">Type</th>
-                  <th className="px-5 py-4 font-medium">Amount</th>
+                  <th className="px-5 py-4 font-medium">Credits</th>
                   <th className="px-5 py-4 font-medium">Date & Time</th>
                   <th className="px-5 py-4 font-medium text-right">Status</th>
                 </tr>
@@ -389,7 +389,7 @@ function TransactionsTab({
                         <td className="px-5 py-3">
                           <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
                             {isPositive ? "+" : "-"}
-                            {formatCurrency(Math.abs(t.amount))}
+                            {formatCredits(Math.abs(t.amount))}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
@@ -434,8 +434,8 @@ function TransactionsTab({
                 <DetailRow label="Withdrawal status" value={details.withdrawalStatus} capitalize />
               )}
               <DetailRow
-                label="Amount"
-                value={(details.amount < 0 ? "-" : "+") + formatCurrency(Math.abs(details.amount))}
+                label="Credits"
+                value={(details.amount < 0 ? "-" : "+") + formatCredits(Math.abs(details.amount))}
                 tone={details.amount < 0 ? "danger" : "success"}
               />
               <DetailRow label="Payment Method" value={details.provider || "—"} capitalize />
@@ -466,6 +466,13 @@ function planName(t: Transaction): string {
   if (!t.plan) return "—";
   if (typeof t.plan === "string") return t.plan;
   return t.plan.name || "—";
+}
+
+function formatCredits(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "0 credits";
+  const n = Number(value);
+  const formatted = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return `${formatted} credits`;
 }
 
 function SubscriptionRevenueTab({ q }: { q: string }) {
