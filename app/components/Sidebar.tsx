@@ -40,6 +40,7 @@ const ITEMS: Item[] = [
   { label: "Session Recordings", href: "/recordings", icon: VideoIcon, permission: "sessions.manage" },
   { label: "Compliance & Safety", href: "/compliance", icon: ShieldIcon, permission: "compliance.manage" },
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
+  { label: "Credit Management", href: "/credits", icon: DollarIcon, permission: "finance.manage" },
   { label: "Content (CMS)", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
   { label: "Support Chat", href: "/chats", icon: ChatIcon, permission: "chats.manage" },
   { label: "Sub Admins", href: "/sub-admins", icon: SubAdminIcon, permission: "sub_admins.manage" },
