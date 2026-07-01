@@ -349,7 +349,7 @@ export interface Transaction {
   provider?: string;
   withdrawalMethod?: string;
   description?: string;
-  withdrawalStatus?: "requested" | "approved" | "paid" | "rejected";
+  withdrawalStatus?: "requested" | "approved" | "processing" | "paid" | "failed" | "rejected";
   createdAt: string;
 }
 
@@ -552,6 +552,89 @@ export interface Commissions {
   silver: number;
   gold: number;
   platinum: number;
+}
+
+/* ----- Payouts (Hyperwallet) ----- */
+
+export interface PayoutConfig {
+  provider: "hyperwallet" | "manual";
+  hyperwalletEnabled: boolean;
+  hyperwalletConfigured: boolean;
+  payoutCreditUsdRate: number;
+  payoutCurrency: string;
+  minPayoutCredits: number;
+}
+
+export interface PayoutAccountInfo {
+  configured: boolean;
+  userToken?: string | null;
+  status?: string | null;
+  hasMethod: boolean;
+  methodType?: "bank_account" | "paypal" | null;
+  methodLabel?: string;
+  currency?: string;
+  verified?: boolean;
+}
+
+export interface PayoutAccountRow {
+  advisor: { _id: string; name: string; email?: string; profilePhoto?: string; country?: string };
+  account: PayoutAccountInfo;
+  availableCredits: number;
+  availableUsd: number;
+  pendingCredits: number;
+  pendingUsd: number;
+  totalWithdrawnCredits: number;
+  totalEarnedCredits: number;
+}
+
+export interface PayoutTransferMethod {
+  token: string;
+  type: string;
+  status?: string;
+  currency?: string;
+  detail?: string;
+}
+
+export interface PayoutAccountDetails {
+  advisor: { _id: string; name: string; email?: string; profilePhoto?: string; country?: string };
+  account: PayoutAccountInfo;
+  transferMethods: PayoutTransferMethod[];
+  balance: {
+    availableCredits: number;
+    availableUsd: number;
+    pendingCredits: number;
+    pendingUsd: number;
+    totalWithdrawnCredits: number;
+  };
+  config: PayoutConfig;
+  recentPayouts: PayoutTransaction[];
+}
+
+export interface PayoutTransaction extends Transaction {
+  amountUsd?: number;
+  payoutCredits?: number;
+  payoutRateUsd?: number;
+  withdrawalStatus?: "requested" | "approved" | "processing" | "paid" | "failed" | "rejected";
+  withdrawalFailureReason?: string;
+  withdrawalRejectedReason?: string;
+  hyperwalletPaymentToken?: string;
+  hyperwalletStatus?: string;
+}
+
+export interface PayoutStatAmount {
+  credits: number;
+  usd: number;
+  count: number;
+}
+
+export interface PayoutStats {
+  config: PayoutConfig;
+  requested: PayoutStatAmount;
+  processing: PayoutStatAmount;
+  paid: PayoutStatAmount;
+  failed: PayoutStatAmount;
+  rejected: PayoutStatAmount;
+  payable: { credits: number; usd: number; pendingCredits: number };
 }
 
 export interface PlanPerformance {

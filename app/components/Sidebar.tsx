@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Banknote } from "lucide-react";
 import { useAuth } from "../lib/auth-context";
 import {
   AdvisorIcon,
@@ -40,6 +41,7 @@ const ITEMS: Item[] = [
   { label: "Session Recordings", href: "/recordings", icon: VideoIcon, permission: "sessions.manage" },
   { label: "Compliance & Safety", href: "/compliance", icon: ShieldIcon, permission: "compliance.manage" },
   { label: "Revenue & Finance", href: "/finance", icon: DollarIcon, permission: "finance.manage" },
+  { label: "Payout Management", href: "/payouts", icon: Banknote, permission: "finance.manage" },
   { label: "Credit Management", href: "/credits", icon: DollarIcon, permission: "finance.manage" },
   { label: "Content (CMS)", href: "/website-management", icon: ContentIcon, permission: "cms.manage" },
   { label: "Support Chat", href: "/chats", icon: ChatIcon, permission: "chats.manage" },

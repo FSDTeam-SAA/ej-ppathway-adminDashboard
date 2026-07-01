@@ -72,6 +72,8 @@ export function StatusBadge({ status }: { status?: string | null }) {
     awaiting_approval: { tone: "warning", label: "Awaiting Approval" },
     approved: { tone: "success", label: "Approved" },
     requested: { tone: "warning", label: "Requested" },
+    processing: { tone: "info", label: "Processing" },
+    failed: { tone: "danger", label: "Failed" },
     paid: { tone: "success", label: "Paid" },
   };
   const { tone, label } = map[s] || { tone: "neutral" as const, label: status };
