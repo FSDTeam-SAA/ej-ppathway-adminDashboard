@@ -16,11 +16,12 @@ type Props = {
   /** Hint shown under the field, e.g. "1920x1080 recommended" */
   hint?: string;
   /** Aspect ratio for preview box, defaults to 16/9 */
-  aspect?: "16/9" | "1/1" | "4/3" | "3/4";
+  aspect?: "16/9" | "3/1" | "1/1" | "4/3" | "3/4";
 };
 
 const aspectClass = {
   "16/9": "aspect-[16/9]",
+  "3/1": "aspect-[3/1]",
   "1/1": "aspect-square",
   "4/3": "aspect-[4/3]",
   "3/4": "aspect-[3/4]"

@@ -6,13 +6,14 @@ import { Input, Textarea } from "../../../components/ui/Input";
 import { useSiteContentEditor } from "../../../lib/use-site-content-editor";
 import { SectionCard, FieldGrid } from "../../../components/website/SectionCard";
 import { RepeatableList } from "../../../components/website/RepeatableList";
+import { ImageUploadField } from "../../../components/website/ImageUploadField";
 import { LinkField } from "../../../components/website/fields";
 import { SaveBar } from "../../../components/website/SaveBar";
 
 type Link = { label?: string; href?: string };
 
 type EthicalSections = {
-  hero?: { badge?: string; title?: string; subtitle?: string; banner?: string };
+  hero?: { badge?: string; title?: string; subtitle?: string; banner?: string; backgroundImage?: string };
   standards?: { icon?: string; title?: string; description?: string }[];
   commitment?: { title?: string; body?: string; ctaPrimary?: Link; ctaSecondary?: Link };
 };
@@ -42,6 +43,15 @@ export default function EthicalStandardsEditorPage() {
           onChange={(e) => ed.updateSection("hero", { subtitle: e.target.value })} />
         <Textarea label="Banner alert text" rows={2} value={ed.sections.hero?.banner || ""}
           onChange={(e) => ed.updateSection("hero", { banner: e.target.value })} />
+        <ImageUploadField
+          label="Background image"
+          value={ed.sections.hero?.backgroundImage || ""}
+          onChange={(url) => ed.updateSection("hero", { backgroundImage: url })}
+          pageSlug="ethical-standards"
+          sectionKey="hero-background"
+          hint="Recommended: wide classroom/chalkboard image, 1920x800 or larger."
+          aspect="3/1"
+        />
       </SectionCard>
 
       <SectionCard title="Standards" description="Each card describes one standard.">

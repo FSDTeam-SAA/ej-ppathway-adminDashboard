@@ -18,6 +18,10 @@ import { useCountryName, formatLocation } from "../../../lib/countries";
 import { useCurrencyCatalog } from "../../../lib/currency";
 import type { AdvisorApplication } from "../../../lib/types";
 
+function isAudioMediaUrl(url: string) {
+  return /\.(aac|aiff|flac|m4a|mp3|ogg|opus|wav)(\?|#|$)/i.test(url);
+}
+
 export default function ApplicationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const countryName = useCountryName();
@@ -53,6 +57,8 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   const [statusLoading, setStatusLoading] = useState(false);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const [profileActionLoading, setProfileActionLoading] = useState(false);
+  const [profileRejectOpen, setProfileRejectOpen] = useState(false);
+  const [profileRejectReason, setProfileRejectReason] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -195,13 +201,18 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     }
   };
 
-  const rejectProfile = async () => {
-    const reason = window.prompt("Why was this profile rejected? What needs to be corrected?");
-    if (!reason?.trim()) return;
+  const submitRejectProfile = async () => {
+    const reason = profileRejectReason.trim();
+    if (!reason) {
+      toast.error("Rejection notes are required");
+      return;
+    }
     setProfileActionLoading(true);
     try {
       await api.patch(`/admin/advisor-applications/${id}/profile/reject`, { reason });
       toast.success("Advisor profile rejected");
+      setProfileRejectOpen(false);
+      setProfileRejectReason("");
       load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
@@ -338,16 +349,22 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
             {/* Right sidebar */}
             <div className="space-y-6">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">Intro video</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">Intro media</h3>
                 {data.introVideoUrl ? (
-                  <video
-                    src={data.introVideoUrl}
-                    controls
-                    className="w-full aspect-video rounded-xl bg-slate-200"
-                  />
+                  isAudioMediaUrl(data.introVideoUrl) ? (
+                    <div className="aspect-video rounded-xl bg-slate-100 flex items-center px-4">
+                      <audio src={data.introVideoUrl} controls className="w-full" />
+                    </div>
+                  ) : (
+                    <video
+                      src={data.introVideoUrl}
+                      controls
+                      className="w-full aspect-video rounded-xl bg-slate-200"
+                    />
+                  )
                 ) : (
                   <div className="aspect-video rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-sm">
-                    No intro video
+                    No intro media
                   </div>
                 )}
               </div>
@@ -386,7 +403,7 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                   </Button>
                   <Button
                     variant="danger"
-                    onClick={rejectProfile}
+                    onClick={() => setProfileRejectOpen(true)}
                     loading={profileActionLoading}
                     className="w-full"
                   >
@@ -593,6 +610,46 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
           <Button onClick={submitContract} loading={contractLoading}>
             Send
           </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={profileRejectOpen}
+        onClose={() => {
+          if (!profileActionLoading) setProfileRejectOpen(false);
+        }}
+        title="Reject Advisor Profile"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Rejection notes are required. Explain why the profile was rejected and what the advisor
+            needs to correct or update. These notes will be emailed to the advisor.
+          </p>
+          <Textarea
+            label="Rejection notes *"
+            rows={6}
+            value={profileRejectReason}
+            onChange={(e) => setProfileRejectReason(e.target.value)}
+            placeholder="Example: Your profile photo is unclear, the bio needs more detail, and your pricing/availability must be completed before approval."
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setProfileRejectOpen(false)}
+              disabled={profileActionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={submitRejectProfile}
+              loading={profileActionLoading}
+              disabled={!profileRejectReason.trim()}
+            >
+              Reject & Email Advisor
+            </Button>
+          </div>
         </div>
       </Modal>
 

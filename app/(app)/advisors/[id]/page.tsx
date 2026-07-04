@@ -53,6 +53,10 @@ const TIER_OPTIONS = [
   { value: "platinum", label: "Platinum" },
 ];
 
+function isAudioMediaUrl(url: string) {
+  return /\.(aac|aiff|flac|m4a|mp3|ogg|opus|wav)(\?|#|$)/i.test(url);
+}
+
 export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -256,8 +260,14 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
 
               {p?.introVideoUrl && (
                 <div className="mt-6">
-                  <div className="text-sm font-medium text-slate-500 mb-2">Intro Video</div>
-                  <video src={p.introVideoUrl} controls className="w-full max-w-xl rounded-xl" />
+                  <div className="text-sm font-medium text-slate-500 mb-2">Intro Media</div>
+                  {isAudioMediaUrl(p.introVideoUrl) ? (
+                    <div className="w-full max-w-xl rounded-xl bg-slate-100 p-4">
+                      <audio src={p.introVideoUrl} controls className="w-full" />
+                    </div>
+                  ) : (
+                    <video src={p.introVideoUrl} controls className="w-full max-w-xl rounded-xl" />
+                  )}
                 </div>
               )}
             </Section>
