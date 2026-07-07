@@ -10,7 +10,6 @@ import {
   ChevronDownIcon,
   ClockIcon,
   CrownIcon,
-  SmartphoneIcon,
   UsersIcon,
 } from "../../components/Icons";
 import { api } from "../../lib/api";
@@ -27,7 +26,6 @@ const RANGE_LABEL: Record<RangeKey, string> = {
 type FunnelStep = { label: string; value: number; pct: number };
 type DropOffRow = { step: string; users: number; rate: number };
 type PaywallSlice = { action: string; label: string; color: string; value: number; pct: number };
-type DeviceSlice = { device: string; label: string; color: string; value: number; pct: number };
 type TimelinePoint = { date: string; label: string; started: number; completed: number; completionRate: number };
 
 type AnalyticsResponse = {
@@ -44,12 +42,6 @@ type AnalyticsResponse = {
   completionTimeline: TimelinePoint[];
   dropOff: DropOffRow[];
   paywall: { totalReached: number; breakdown: PaywallSlice[] };
-  devices: {
-    totalCompleted: number;
-    breakdown: DeviceSlice[];
-    mobileCompletionRate: number;
-    mobileCompletionDelta: number;
-  };
 };
 
 const FUNNEL_COLORS = [
@@ -146,8 +138,8 @@ export default function OnboardingAnalyticsPage() {
           </Card>
         </div>
 
-        {/* Drop-off + Paywall donut + Device donut */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Drop-off + Paywall conversion */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <Card>
             <CardHeader title="Drop-off Analysis" range={range} />
             <DropOffTable rows={data?.dropOff ?? []} />
@@ -158,18 +150,6 @@ export default function OnboardingAnalyticsPage() {
             <PaywallDonut
               total={data?.paywall.totalReached ?? 0}
               slices={data?.paywall.breakdown ?? []}
-            />
-          </Card>
-
-          <Card>
-            <CardHeader title="Completion Rate by Device" range={range} />
-            <DeviceDonut
-              total={data?.devices.totalCompleted ?? 0}
-              slices={data?.devices.breakdown ?? []}
-            />
-            <MobileCompletionWidget
-              rate={data?.devices.mobileCompletionRate ?? 0}
-              delta={data?.devices.mobileCompletionDelta ?? 0}
             />
           </Card>
         </div>
@@ -500,75 +480,6 @@ function PaywallDonut({ total, slices }: { total: number; slices: PaywallSlice[]
             </span>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------- Device donut ----------
-
-function DeviceDonut({ total, slices }: { total: number; slices: DeviceSlice[] }) {
-  return (
-    <div className="flex items-center gap-4">
-      <DonutChart
-        data={slices.map((d) => ({
-          label: d.label,
-          value: d.value,
-          color: d.color,
-        }))}
-        size={170}
-        thickness={28}
-        centerLabel={total.toLocaleString()}
-        centerSub="Completed Users"
-        showLegend={false}
-      />
-      <div className="flex-1 space-y-2">
-        {slices.map((d) => (
-          <div
-            key={d.device}
-            className="flex items-center justify-between text-sm"
-          >
-            <span className="flex items-center gap-2 text-slate-700">
-              <span
-                className="h-2.5 w-2.5 rounded-full inline-block"
-                style={{ background: d.color }}
-              />
-              {d.label}
-            </span>
-            <span className="text-slate-700 tabular-nums">
-              {d.value.toLocaleString()}{" "}
-              <span className="text-slate-400">({d.pct.toFixed(1)}%)</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MobileCompletionWidget({
-  rate,
-  delta,
-}: {
-  rate: number;
-  delta: number;
-}) {
-  const sign = delta >= 0 ? "+" : "";
-  return (
-    <div className="mt-5 rounded-xl bg-[#e6f2f6]/80 px-4 py-3 flex items-center gap-3">
-      <div className="h-11 w-11 rounded-lg bg-white inline-flex items-center justify-center text-[#0a7a90]">
-        <SmartphoneIcon size={20} />
-      </div>
-      <div className="flex-1">
-        <div className="text-xs text-slate-600">
-          Mobile Users Completion Rate
-        </div>
-        <div className="text-2xl font-bold text-slate-900 leading-tight">
-          {rate.toFixed(1)}%
-        </div>
-      </div>
-      <div className="text-xs text-[#0a7a90] font-medium whitespace-nowrap">
-        {sign}{delta.toFixed(1)}% From last week
       </div>
     </div>
   );

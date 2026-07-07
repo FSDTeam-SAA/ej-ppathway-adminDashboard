@@ -303,7 +303,7 @@ function SignupCreditsForm() {
         Customer Credits
       </h3>
       <p className="text-sm text-slate-500 mb-4">
-        Control credit packs, custom credit purchase rate, RevenueCat product ids, signup credits, and add-on credit costs.
+        Control signup credits, add-on credit costs, custom credit purchase rate, and the mobile credit banner.
       </p>
       {loadError && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -355,75 +355,17 @@ function SignupCreditsForm() {
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold text-slate-900">Credit Packs</h4>
-              <Button
-                variant="outline"
-                onClick={() => setSettings({
-                  ...settings,
-                  creditPacks: [
-                    ...settings.creditPacks,
-                    {
-                      id: `credits_${Date.now()}`,
-                      label: "New Credit Pack",
-                      credits: 25,
-                      priceUsd: 19,
-                      revenueCatProductId: "",
-                      isActive: true,
-                      sortOrder: settings.creditPacks.length + 1,
-                    },
-                  ],
-                })}
-              >
-                Add Pack
-              </Button>
-            </div>
-            <div className="space-y-3">
-              {settings.creditPacks.map((pack, index) => (
-                <div key={`${pack.id}-${index}`} className="grid grid-cols-1 md:grid-cols-6 gap-3 rounded-xl border border-slate-100 p-3">
-                  <Input
-                    label="ID"
-                    value={pack.id}
-                    onChange={(e) => updatePack(settings, setSettings, index, { id: e.target.value })}
-                  />
-                  <Input
-                    label="Label"
-                    value={pack.label}
-                    onChange={(e) => updatePack(settings, setSettings, index, { label: e.target.value })}
-                  />
-                  <Input
-                    label="Credits"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={String(pack.credits)}
-                    onChange={(e) => updatePack(settings, setSettings, index, { credits: Number(e.target.value) })}
-                  />
-                  <Input
-                    label="USD price"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={String(pack.priceUsd)}
-                    onChange={(e) => updatePack(settings, setSettings, index, { priceUsd: Number(e.target.value) })}
-                  />
-                  <Input
-                    label="RevenueCat product"
-                    value={pack.revenueCatProductId || ""}
-                    onChange={(e) => updatePack(settings, setSettings, index, { revenueCatProductId: e.target.value })}
-                  />
-                  <label className="flex items-end gap-2 text-sm text-slate-700 pb-2">
-                    <input
-                      type="checkbox"
-                      checked={pack.isActive !== false}
-                      onChange={(e) => updatePack(settings, setSettings, index, { isActive: e.target.checked })}
-                    />
-                    Active
-                  </label>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Banner title"
+              value={settings.creditBannerTitle}
+              onChange={(e) => setSettings({ ...settings, creditBannerTitle: e.target.value })}
+            />
+            <Input
+              label="Banner subtitle"
+              value={settings.creditBannerSubtitle}
+              onChange={(e) => setSettings({ ...settings, creditBannerSubtitle: e.target.value })}
+            />
           </div>
         </div>
       )}
@@ -436,20 +378,11 @@ function SignupCreditsForm() {
   );
 }
 
-type CreditPack = {
-  id: string;
-  label: string;
-  credits: number;
-  priceUsd: number;
-  revenueCatProductId?: string;
-  isActive?: boolean;
-  sortOrder?: number;
-};
-
 type CreditSettings = {
   signupFreeCredits: number;
   creditUsdRate: number;
-  creditPacks: CreditPack[];
+  creditBannerTitle: string;
+  creditBannerSubtitle: string;
   creditUsage: {
     chatTranscript: number;
     sessionRecording: number;
@@ -460,15 +393,8 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
   return {
     signupFreeCredits: Number(data?.signupFreeCredits ?? 0),
     creditUsdRate: Number(data?.creditUsdRate ?? 1),
-    creditPacks: (data?.creditPacks?.length ? data.creditPacks : DEFAULT_CREDIT_PACKS).map((p, index) => ({
-      id: p.id || `credits_${index + 1}`,
-      label: p.label || `${p.credits || 0} Credits`,
-      credits: Number(p.credits || 0),
-      priceUsd: Number(p.priceUsd || 0),
-      revenueCatProductId: p.revenueCatProductId || p.id || "",
-      isActive: p.isActive !== false,
-      sortOrder: Number(p.sortOrder ?? index + 1),
-    })),
+    creditBannerTitle: data?.creditBannerTitle?.trim() || "Prophetic Guidance",
+    creditBannerSubtitle: data?.creditBannerSubtitle?.trim() || "As low as $1 per credit",
     creditUsage: {
       chatTranscript: Number(data?.creditUsage?.chatTranscript ?? 5),
       sessionRecording: Number(data?.creditUsage?.sessionRecording ?? 5),
@@ -476,41 +402,18 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
   };
 }
 
-const DEFAULT_CREDIT_PACKS: CreditPack[] = [
-  { id: "credits_25", label: "25 Credits", credits: 25, priceUsd: 19, revenueCatProductId: "credits_25", isActive: true, sortOrder: 1 },
-  { id: "credits_50", label: "50 Credits", credits: 50, priceUsd: 35, revenueCatProductId: "credits_50", isActive: true, sortOrder: 2 },
-  { id: "credits_100", label: "100 Credits", credits: 100, priceUsd: 59, revenueCatProductId: "credits_100", isActive: true, sortOrder: 3 },
-  { id: "credits_200", label: "200 Credits", credits: 200, priceUsd: 99, revenueCatProductId: "credits_200", isActive: true, sortOrder: 4 },
-];
-
-function updatePack(
-  settings: CreditSettings,
-  setSettings: (next: CreditSettings) => void,
-  index: number,
-  patch: Partial<CreditPack>,
-) {
-  setSettings({
-    ...settings,
-    creditPacks: settings.creditPacks.map((pack, i) =>
-      i === index ? { ...pack, ...patch } : pack,
-    ),
-  });
-}
-
 function validateCreditSettings(settings: CreditSettings, error: (message: string) => void) {
   if (!Number.isFinite(settings.creditUsdRate) || settings.creditUsdRate <= 0) {
     error("USD per credit must be greater than 0");
     return false;
   }
-  if (!settings.creditPacks.length) {
-    error("Add at least one credit pack");
+  if (!settings.creditBannerTitle.trim()) {
+    error("Banner title is required");
     return false;
   }
-  for (const pack of settings.creditPacks) {
-    if (!pack.id.trim() || !pack.label.trim() || pack.credits <= 0 || pack.priceUsd < 0) {
-      error("Each pack needs an ID, label, positive credits, and non-negative price");
-      return false;
-    }
+  if (!settings.creditBannerSubtitle.trim()) {
+    error("Banner subtitle is required");
+    return false;
   }
   return true;
 }

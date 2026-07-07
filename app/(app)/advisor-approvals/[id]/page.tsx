@@ -302,13 +302,13 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     value={yesNoLabel(data.baptizedInHolySpirit)}
                   />
                   <Field label="Submitted" value={formatDate(data.createdAt, true)} />
-                  <Field label="Date of Birth" value={data.applicantDetails?.dateOfBirth || "â€”"} />
-                  <Field label="Address" value={data.applicantDetails?.address || "â€”"} />
-                  <Field label="State" value={data.applicantDetails?.state || "â€”"} />
-                  <Field label="City" value={data.applicantDetails?.city || "â€”"} />
+                  <Field label="Date of Birth" value={data.applicantDetails?.dateOfBirth || "N/A"} />
+                  <Field label="Address" value={data.applicantDetails?.address || "N/A"} />
+                  <Field label="State" value={data.applicantDetails?.state || "N/A"} />
+                  <Field label="City" value={data.applicantDetails?.city || "N/A"} />
                   <Field
                     label="Country"
-                    value={countryName(data.applicantDetails?.country) || data.applicantDetails?.country || "â€”"}
+                    value={countryName(data.applicantDetails?.country) || data.applicantDetails?.country || "N/A"}
                   />
                   <Field label="Chat Per Min" value={formatPrice(data.pricing?.chatPerMin)} />
                   <Field label="Call Per Min" value={formatPrice(data.pricing?.callPerMin)} />

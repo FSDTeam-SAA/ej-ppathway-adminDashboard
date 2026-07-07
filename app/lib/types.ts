@@ -124,6 +124,18 @@ export interface AdvisorPricing {
   videoPerMin?: number;
 }
 
+export type AdvisorScheduleSlot = {
+  from?: string;
+  to?: string;
+};
+
+export type AdvisorDaySchedule = {
+  enabled?: boolean;
+  from?: string;
+  to?: string;
+  slots?: AdvisorScheduleSlot[];
+};
+
 export interface AdvisorProfile {
   _id: string;
   user: string;
@@ -146,7 +158,7 @@ export interface AdvisorProfile {
   isOnline?: boolean;
   lastSeenAt?: string;
   autoOnlineMode?: boolean;
-  weeklySchedule?: Record<string, { enabled?: boolean; from?: string; to?: string }>;
+  weeklySchedule?: Record<string, AdvisorDaySchedule>;
 }
 
 export interface AdvisorMetrics {
@@ -171,7 +183,7 @@ export interface AdvisorMetrics {
   availability: {
     isOnline: boolean;
     availableNow: boolean;
-    weeklySchedule: Record<string, { enabled?: boolean; from?: string; to?: string }> | null;
+    weeklySchedule: Record<string, AdvisorDaySchedule> | null;
   };
 }
 

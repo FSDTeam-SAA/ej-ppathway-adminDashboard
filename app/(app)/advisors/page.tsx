@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Topbar } from "../../components/Topbar";
 import { PageHeader } from "../../components/PageHeader";
@@ -19,6 +19,12 @@ import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { useCountries, useCities } from "../../lib/countries";
+import {
+  ADVISOR_EXPERTISE_OPTIONS,
+  ADVISOR_STYLE_OPTIONS,
+  TIER_OPTIONS,
+  getTimezoneOptions,
+} from "../../lib/advisor-options";
 import type { AdvisorListItem } from "../../lib/types";
 
 const TABS = [
@@ -207,7 +213,7 @@ export default function AdvisorsPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-slate-700">
-                            {price ? `${Number(price).toFixed(2)} credits/min` : "â€”"}
+                            {price ? `${Number(price).toFixed(2)} credits/min` : "N/A"}
                           </td>
                           <td className="px-5 py-3 text-slate-700">{sessions}</td>
                           <td className="px-5 py-3">
@@ -319,6 +325,67 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function MultiSelectField({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const toggle = (next: string) => {
+    const set = new Set(selected);
+    if (set.has(next)) set.delete(next);
+    else set.add(next);
+    onChange(Array.from(set).join(", "));
+  };
+
+  return (
+    <div>
+      <div className="mb-1.5 text-sm font-medium text-slate-700">{label}</div>
+      <div className="rounded-lg border border-transparent bg-[#e6f2f6]/60 p-2">
+        <div className="mb-2 flex min-h-6 flex-wrap gap-1">
+          {selected.length ? (
+            selected.map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-700"
+              >
+                {item}
+              </span>
+            ))
+          ) : (
+            <span className="px-1 text-sm text-slate-500">Select {label.toLowerCase()}</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {options.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-white"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(option.value)}
+                onChange={() => toggle(option.value)}
+                className="h-4 w-4 accent-[#0a7a90]"
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddAdvisorModal({
   open,
   onClose,
@@ -351,6 +418,7 @@ function AddAdvisorModal({
   });
   const countries = useCountries();
   const cities = useCities(form.country);
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), []);
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
 
@@ -407,7 +475,7 @@ function AddAdvisorModal({
       <Modal open={open} onClose={handleClose} title="Advisor Account Created" size="md">
         <div className="space-y-4">
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
-            Account created successfully. Share these login credentials with the advisor â€” they can login to the Advisor Dashboard immediately.
+            Account created successfully. Share these login credentials with the advisor - they can login to the Advisor Dashboard immediately.
           </div>
           <CopyField label="Email" value={created.email} />
           <CopyField label="Password" value={created.password} />
@@ -452,8 +520,8 @@ function AddAdvisorModal({
             options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
             value={form.country}
             onChange={(v) => setForm((s) => ({ ...s, country: v, city: "" }))}
-            placeholder="Select countryâ€¦"
-            searchPlaceholder="Search countriesâ€¦"
+            placeholder="Select country"
+            searchPlaceholder="Search countries..."
             emptyText="No country found."
           />
         </label>
@@ -471,19 +539,26 @@ function AddAdvisorModal({
             options={cities.map((c) => ({ value: c, label: c }))}
             value={form.city}
             onChange={(v) => onChange("city", v)}
-            placeholder={form.country ? "Select cityâ€¦" : "Select a country first"}
-            searchPlaceholder="Search citiesâ€¦"
+            placeholder={form.country ? "Select city" : "Select a country first"}
+            searchPlaceholder="Search cities"
             emptyText="No city found."
             disabled={!form.country}
             allowCustom
           />
         </label>
-        <Input
-          label="Time Zone"
-          value={form.timezone}
-          onChange={(e) => onChange("timezone", e.target.value)}
-          placeholder="e.g. America/New_York"
-        />
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">
+            Time Zone
+          </span>
+          <Combobox
+            options={timezoneOptions}
+            value={form.timezone}
+            onChange={(v) => onChange("timezone", v)}
+            placeholder="Select timezone..."
+            searchPlaceholder="Search timezones..."
+            emptyText="No timezone found."
+          />
+        </label>
         <Input
           label="Professional Title"
           value={form.professionalTitle}
@@ -514,29 +589,25 @@ function AddAdvisorModal({
             Tier Rank
           </span>
           <Combobox
-            options={[
-              { value: "silver", label: "Silver" },
-              { value: "gold", label: "Gold" },
-              { value: "platinum", label: "Platinum" },
-            ]}
+            options={TIER_OPTIONS}
             value={form.tier}
             onChange={(v) => onChange("tier", v)}
-            placeholder="Select tierâ€¦"
-            searchPlaceholder="Search tiersâ€¦"
+            placeholder="Select tier"
+            searchPlaceholder="Search tiers"
             emptyText="No tier found."
           />
         </label>
-        <Input
+        <MultiSelectField
           label="Expertise Areas"
+          options={ADVISOR_EXPERTISE_OPTIONS}
           value={form.type}
-          onChange={(e) => onChange("type", e.target.value)}
-          placeholder="e.g. Love & Relationship, Career"
+          onChange={(v) => onChange("type", v)}
         />
-        <Input
+        <MultiSelectField
           label="Styles"
+          options={ADVISOR_STYLE_OPTIONS}
           value={form.style}
-          onChange={(e) => onChange("style", e.target.value)}
-          placeholder="e.g. Compassionate, Direct"
+          onChange={(v) => onChange("style", v)}
         />
       </div>
 

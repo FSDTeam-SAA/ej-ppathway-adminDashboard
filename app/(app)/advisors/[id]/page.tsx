@@ -1,8 +1,7 @@
 ﻿"use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Topbar } from "../../../components/Topbar";
 import { PageHeader } from "../../../components/PageHeader";
 import { Avatar } from "../../../components/ui/Avatar";
@@ -16,6 +15,12 @@ import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatCurrency, formatDate, formatRelative } from "../../../lib/format";
 import type { AdvisorProfile, AdminUser, Wallet, AdvisorMetrics } from "../../../lib/types";
+import {
+  ADVISOR_EXPERTISE_OPTIONS,
+  ADVISOR_STYLE_OPTIONS,
+  TIER_OPTIONS,
+  getTimezoneOptions,
+} from "../../../lib/advisor-options";
 import { StarIcon } from "../../../components/Icons";
 import {
   MapPin,
@@ -47,12 +52,6 @@ const DAY_ORDER = [
   "sunday",
 ];
 
-const TIER_OPTIONS = [
-  { value: "silver", label: "Silver" },
-  { value: "gold", label: "Gold" },
-  { value: "platinum", label: "Platinum" },
-];
-
 function isAudioMediaUrl(url: string) {
   return /\.(aac|aiff|flac|m4a|mp3|ogg|opus|wav)(\?|#|$)/i.test(url);
 }
@@ -66,6 +65,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const [loading, setLoading] = useState(true);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
 
@@ -119,6 +119,21 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const openChat = async () => {
+    if (!u?._id) return;
+    setChatLoading(true);
+    try {
+      const r = await api.post<{ _id: string }>(`/chats/admin/with/${u._id}`, {});
+      if (r.data?._id) router.push(`/chats/${r.data._id}`);
+      else router.push(`/chats?user=${u._id}`);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Could not open conversation";
+      toast.error(msg);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const u = data?.user;
   const p = data?.profile;
   const m = data?.metrics;
@@ -167,7 +182,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                       {TIER_OPTIONS.find((t) => t.value === (["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver"))?.label}
                     </Badge>
                     {m?.availability.availableNow && (
-                      <Badge tone="success">â— Available Now</Badge>
+                      <Badge tone="success">Available Now</Badge>
                     )}
                   </div>
                   <p className="text-slate-500 mt-0.5">
@@ -176,7 +191,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-slate-500">
                     <span className="inline-flex items-center gap-1">
                       <MapPin size={14} />
-                      {formatLocation(u.city, countryName(u.country)) || "â€”"}
+                      {formatLocation(u.city, countryName(u.country)) || "N/A"}
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <StarIcon size={14} filled />
@@ -210,14 +225,14 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                         {u.phone}
                       </span>
                     ) : (
-                      "â€”"
+                      "N/A"
                     )
                   }
                 />
-                <Field label="Country" value={countryName(u.country) || "â€”"} />
-                <Field label="State / Region" value={u.state || "â€”"} />
-                <Field label="City" value={u.city || "â€”"} />
-                <Field label="Time Zone" value={u.timezone || "â€”"} />
+                <Field label="Country" value={countryName(u.country) || "N/A"} />
+                <Field label="State / Region" value={u.state || "N/A"} />
+                <Field label="City" value={u.city || "N/A"} />
+                <Field label="Time Zone" value={u.timezone || "N/A"} />
                 <Field label="Account Status" value={<StatusBadge status={u.status} />} />
                 <Field label="Tier Rank" value={<span className="capitalize">{["silver", "gold", "platinum"].includes(p?.tier ?? "") ? p!.tier : "silver"}</span>} />
                 <Field
@@ -233,15 +248,15 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                   label="Price Per Min"
                   value={
                     <span className="text-slate-700">
-                      {pricing?.chatPerMin ?? 0} chat credits/min Â· {pricing?.callPerMin ?? 0} call credits/min Â· {pricing?.videoPerMin ?? 0} video credits/min
+                      {pricing?.chatPerMin ?? 0} chat credits/min | {pricing?.callPerMin ?? 0} call credits/min | {pricing?.videoPerMin ?? 0} video credits/min
                     </span>
                   }
                 />
                 <Field label="Date Joined" value={formatDate(u.createdAt)} />
-                <Field label="Last Login" value={u.lastLoginAt ? formatRelative(u.lastLoginAt) : "â€”"} />
+                <Field label="Last Login" value={u.lastLoginAt ? formatRelative(u.lastLoginAt) : "N/A"} />
                 <Field
                   label="Last Active"
-                  value={p?.lastSeenAt ? formatRelative(p.lastSeenAt) : "â€”"}
+                  value={p?.lastSeenAt ? formatRelative(p.lastSeenAt) : "N/A"}
                 />
               </div>
 
@@ -338,8 +353,10 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                     >
                       <span className="capitalize text-slate-700">{day}</span>
                       {enabled ? (
-                        <span className="text-[#0a7a90] font-medium">
-                          {slot?.from || "â€”"} - {slot?.to || "â€”"}
+                        <span className="text-[#0a7a90] font-medium text-right">
+                          {slot?.slots?.length
+                            ? slot.slots.map((s) => `${s.from || "-"} - ${s.to || "-"}`).join(", ")
+                            : `${slot?.from || "N/A"} - ${slot?.to || "N/A"}`}
                         </span>
                       ) : (
                         <span className="text-slate-400 text-sm">Unavailable</span>
@@ -371,11 +388,9 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                     ))}
                   </select>
                 </div>
-                <Link href={`/chats?user=${u._id}`}>
-                  <Button variant="outline">
-                    <MessageSquare size={16} /> Send Message
-                  </Button>
-                </Link>
+                <Button variant="outline" onClick={openChat} loading={chatLoading}>
+                  <MessageSquare size={16} /> Send Message
+                </Button>
                 <Button variant="outline" onClick={() => setResetOpen(true)}>
                   <KeyRound size={16} /> Reset Password
                 </Button>
@@ -476,8 +491,69 @@ function TagBlock({
             </Badge>
           ))
         ) : (
-          <span className="text-sm text-slate-400">â€”</span>
+          <span className="text-sm text-slate-400">N/A</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function MultiSelectField({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const toggle = (next: string) => {
+    const set = new Set(selected);
+    if (set.has(next)) set.delete(next);
+    else set.add(next);
+    onChange(Array.from(set).join(", "));
+  };
+
+  return (
+    <div>
+      <div className="mb-1.5 text-sm font-medium text-slate-700">{label}</div>
+      <div className="rounded-lg border border-transparent bg-[#e6f2f6]/60 p-2">
+        <div className="mb-2 flex min-h-6 flex-wrap gap-1">
+          {selected.length ? (
+            selected.map((item) => (
+              <span
+                key={item}
+                className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-700"
+              >
+                {item}
+              </span>
+            ))
+          ) : (
+            <span className="px-1 text-sm text-slate-500">Select {label.toLowerCase()}</span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {options.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-white"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(option.value)}
+                onChange={() => toggle(option.value)}
+                className="h-4 w-4 accent-[#0a7a90]"
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -541,6 +617,33 @@ function ResetPasswordModal({
   );
 }
 
+type WeeklyScheduleForm = Record<
+  string,
+  { enabled: boolean; from: string; to: string; slots: Array<{ from: string; to: string }> }
+>;
+
+const defaultWeeklySchedule = (profile?: AdvisorProfile | null): WeeklyScheduleForm =>
+  Object.fromEntries(
+    DAY_ORDER.map((day) => {
+      const current = profile?.weeklySchedule?.[day];
+      const slots = current?.slots?.length
+        ? current.slots.map((slot) => ({
+            from: slot.from || "09:00",
+            to: slot.to || "18:00",
+          }))
+        : [{ from: current?.from || "09:00", to: current?.to || "18:00" }];
+      return [
+        day,
+        {
+          enabled: current?.enabled === true,
+          from: slots[0]?.from || "09:00",
+          to: slots[0]?.to || "18:00",
+          slots,
+        },
+      ];
+    }),
+  ) as WeeklyScheduleForm;
+
 function EditAdvisorModal({
   open,
   onClose,
@@ -558,7 +661,8 @@ function EditAdvisorModal({
 }) {
   const toast = useToast();
   const countries = useCountries();
-  const [form, setForm] = useState({
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), []);
+  const buildInitialForm = () => ({
     name: user.name || "",
     phoneNumber: user.phone || "",
     country: user.country || "",
@@ -575,11 +679,36 @@ function EditAdvisorModal({
     videoPerMin: profile?.pricing?.videoPerMin?.toString() || "",
     bio: profile?.bio || "",
     detailedDescription: profile?.detailedDescription || "",
+    isOnline: !!profile?.isOnline,
+    autoOnlineMode: !!profile?.autoOnlineMode,
+    weeklySchedule: defaultWeeklySchedule(profile),
   });
+  const [form, setForm] = useState(buildInitialForm);
   const cities = useCities(form.country);
   const [loading, setLoading] = useState(false);
 
-  const onChange = (k: keyof typeof form, v: string) => setForm((s) => ({ ...s, [k]: v }));
+  useEffect(() => {
+    if (open) setForm(buildInitialForm());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user._id, profile?._id]);
+
+  const onChange = (k: keyof typeof form, v: string | boolean | WeeklyScheduleForm) =>
+    setForm((s) => ({ ...s, [k]: v }));
+  const updateDay = (
+    day: string,
+    patch: Partial<WeeklyScheduleForm[string]>,
+  ) => {
+    setForm((s) => ({
+      ...s,
+      weeklySchedule: {
+        ...s.weeklySchedule,
+        [day]: {
+          ...s.weeklySchedule[day],
+          ...patch,
+        },
+      },
+    }));
+  };
 
   const submit = async () => {
     setLoading(true);
@@ -603,6 +732,9 @@ function EditAdvisorModal({
           callPerMin: form.callPerMin,
           videoPerMin: form.videoPerMin,
         },
+        isOnline: form.isOnline,
+        autoOnlineMode: form.autoOnlineMode,
+        weeklySchedule: form.weeklySchedule,
       });
       toast.success("Advisor updated");
       onSaved();
@@ -629,8 +761,8 @@ function EditAdvisorModal({
             options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
             value={form.country}
             onChange={(v) => setForm((s) => ({ ...s, country: v, city: "" }))}
-            placeholder="Select countryâ€¦"
-            searchPlaceholder="Search countriesâ€¦"
+            placeholder="Select country..."
+            searchPlaceholder="Search countries..."
             emptyText="No country found."
           />
         </label>
@@ -645,19 +777,24 @@ function EditAdvisorModal({
             options={cities.map((c) => ({ value: c, label: c }))}
             value={form.city}
             onChange={(v) => onChange("city", v)}
-            placeholder={form.country ? "Select cityâ€¦" : "Select a country first"}
-            searchPlaceholder="Search citiesâ€¦"
+            placeholder={form.country ? "Select city..." : "Select a country first"}
+            searchPlaceholder="Search cities..."
             emptyText="No city found."
             disabled={!form.country}
             allowCustom
           />
         </label>
-        <Input
-          label="Time Zone"
-          value={form.timezone}
-          onChange={(e) => onChange("timezone", e.target.value)}
-          placeholder="e.g. America/New_York"
-        />
+        <label className="block">
+          <span className="block mb-1.5 text-sm font-medium text-slate-700">Time Zone</span>
+          <Combobox
+            options={timezoneOptions}
+            value={form.timezone}
+            onChange={(v) => onChange("timezone", v)}
+            placeholder="Select timezone..."
+            searchPlaceholder="Search timezones..."
+            emptyText="No timezone found."
+          />
+        </label>
         <Input
           label="Professional Title"
           value={form.professionalTitle}
@@ -669,22 +806,22 @@ function EditAdvisorModal({
             options={TIER_OPTIONS}
             value={form.tier}
             onChange={(v) => onChange("tier", v)}
-            placeholder="Select tierâ€¦"
-            searchPlaceholder="Search tiersâ€¦"
+            placeholder="Select tier..."
+            searchPlaceholder="Search tiers..."
             emptyText="No tier found."
           />
         </label>
-        <Input
+        <MultiSelectField
           label="Expertise Areas"
+          options={ADVISOR_EXPERTISE_OPTIONS}
           value={form.expertise}
-          onChange={(e) => onChange("expertise", e.target.value)}
-          placeholder="Comma separated"
+          onChange={(v) => onChange("expertise", v)}
         />
-        <Input
+        <MultiSelectField
           label="Styles"
+          options={ADVISOR_STYLE_OPTIONS}
           value={form.styles}
-          onChange={(e) => onChange("styles", e.target.value)}
-          placeholder="Comma separated"
+          onChange={(v) => onChange("styles", v)}
         />
         <Input
           label="Languages"
@@ -718,12 +855,87 @@ function EditAdvisorModal({
         </div>
       </div>
 
+      <div className="mt-5">
+        <p className="text-sm font-semibold text-slate-700 mb-2">Availability</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <label className="block">
+            <span className="block mb-1.5 text-sm font-medium text-slate-700">Current Online Status</span>
+            <Combobox
+              options={[
+                { value: "online", label: "Online" },
+                { value: "offline", label: "Offline" },
+                { value: "busy", label: "Busy" },
+                { value: "away", label: "Away" },
+              ]}
+              value={form.isOnline ? "online" : "offline"}
+              onChange={(v) => onChange("isOnline", v === "online")}
+              placeholder="Select status..."
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 mt-6 md:mt-0">
+            <span>
+              <span className="block text-sm font-medium text-slate-700">Auto Online Mode</span>
+              <span className="block text-xs text-slate-500">Use weekly schedule to go online automatically</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.autoOnlineMode}
+              onChange={(e) => onChange("autoOnlineMode", e.target.checked)}
+              className="h-5 w-5 accent-[#0a7a90]"
+            />
+          </label>
+        </div>
+        <div className="space-y-2">
+          {DAY_ORDER.map((day) => {
+            const current = form.weeklySchedule[day];
+            return (
+              <div
+                key={day}
+                className="grid grid-cols-1 md:grid-cols-[120px_1fr_1fr] gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3"
+              >
+                <label className="flex items-center gap-2 text-sm font-medium capitalize text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={current.enabled}
+                    onChange={(e) => updateDay(day, { enabled: e.target.checked })}
+                    className="h-4 w-4 accent-[#0a7a90]"
+                  />
+                  {day}
+                </label>
+                <Input
+                  label="Start"
+                  type="time"
+                  value={current.from}
+                  onChange={(e) =>
+                    updateDay(day, {
+                      from: e.target.value,
+                      slots: [{ from: e.target.value, to: current.to }],
+                    })
+                  }
+                />
+                <Input
+                  label="End"
+                  type="time"
+                  value={current.to}
+                  onChange={(e) =>
+                    updateDay(day, {
+                      to: e.target.value,
+                      slots: [{ from: current.from, to: e.target.value }],
+                    })
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="mt-4">
         <Textarea
           label="Bio / About the Advisor"
           value={form.detailedDescription}
           onChange={(e) => onChange("detailedDescription", e.target.value)}
-          placeholder="Detailed descriptionâ€¦"
+          placeholder="Detailed description..."
         />
       </div>
 
