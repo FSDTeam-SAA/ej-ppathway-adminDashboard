@@ -10,6 +10,7 @@ import { Badge, StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { Skeleton, TableSkeleton } from "../../components/Skeleton";
 import { Button } from "../../components/ui/Button";
+import { Input, Select } from "../../components/ui/Input";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { EyeIcon, DollarIcon, ClockIcon, UsersIcon } from "../../components/Icons";
 import { Download, Wallet as WalletIcon } from "lucide-react";
@@ -31,7 +32,7 @@ const TABS = [
   { value: "advisor-earnings", label: "Advisor Earnings" },
   { value: "payouts", label: "Payouts" },
   { value: "refunds", label: "Refunds & Disputes" },
-  { value: "subscriptions", label: "Subscription Revenue" },
+  { value: "subscriptions", label: "Credit Purchases" },
   { value: "commissions", label: "Commissions" },
 ];
 
@@ -215,7 +216,7 @@ export default function FinancePage() {
                   { label: "Voice", value: sources.voiceSessions || 0 },
                   { label: "Video", value: sources.videoSessions || 0 },
                   { label: "Chat", value: sources.chatSessions || 0 },
-                  { label: "Subscriptions", value: sources.subscriptionRevenue || 0 },
+                  { label: "Transcript", value: sources.subscriptionRevenue || 0 },
                   { label: "Recordings", value: sources.recordingPurchases || 0 },
                   { label: "Featured", value: sources.featuredAdvisorFees || 0 },
                 ]}
@@ -228,6 +229,24 @@ export default function FinancePage() {
 
         <div className="mb-6">
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search transaction, user, advisor, or description..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Select value={tab} onChange={(e) => setTab(e.target.value)}>
+            {TABS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </Select>
+          <Select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
+            {PERIODS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </Select>
         </div>
 
         {tab === "transactions" && (
@@ -486,7 +505,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
   useEffect(() => {
     setLoading(true);
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "subscription", q: q || undefined })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "credit_pack_purchase,wallet_topup", q: q || undefined })
       .then((r) => {
         setItems(r.data || []);
         setTotal(r.meta?.total || 0);
@@ -499,7 +518,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <ExportButton report="transactions" query={{ type: "subscription" }} />
+        <ExportButton report="transactions" query={{ type: "credit_pack_purchase,wallet_topup" }} />
       </div>
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
@@ -511,8 +530,8 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
                 <tr className="border-b border-slate-100">
                   <th className="px-5 py-4 font-medium">Transaction ID</th>
                   <th className="px-5 py-4 font-medium">Username</th>
-                  <th className="px-5 py-4 font-medium">Subscription Plan</th>
-                  <th className="px-5 py-4 font-medium">Amount Paid</th>
+                  <th className="px-5 py-4 font-medium">Credit Source</th>
+                  <th className="px-5 py-4 font-medium">Credits / Amount</th>
                   <th className="px-5 py-4 font-medium">Date</th>
                   <th className="px-5 py-4 font-medium text-right">Status</th>
                 </tr>
@@ -521,7 +540,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-slate-500">
-                      No subscription revenue yet
+                      No credit purchases yet
                     </td>
                   </tr>
                 ) : (
@@ -531,7 +550,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
                         {t.txCode || `TXN-${t._id.slice(-4).toUpperCase()}`}
                       </td>
                       <td className="px-5 py-3">{t.user?.name || "—"}</td>
-                      <td className="px-5 py-3">{planName(t)}</td>
+                      <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
                       <td className="px-5 py-3 font-medium text-emerald-600">{formatCurrency(t.amount)}</td>
                       <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
                       <td className="px-5 py-3 text-right">

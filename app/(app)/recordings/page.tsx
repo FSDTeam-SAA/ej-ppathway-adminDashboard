@@ -8,6 +8,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { StatusBadge } from "../../components/ui/Badge";
 import { TableSkeleton } from "../../components/Skeleton";
 import { Modal } from "../../components/ui/Modal";
+import { Input, Select } from "../../components/ui/Input";
 import { Spinner } from "../../components/Spinner";
 import { CallIcon, VideoIcon, PlayIcon } from "../../components/Icons";
 import { MessageSquare } from "lucide-react";
@@ -26,6 +27,247 @@ const TYPE_FILTERS: { value: TabValue; label: string }[] = [
 ];
 
 const typeLabel = (t?: string) => (t === "call" ? "Voice" : t === "video" ? "Video" : "Chat");
+
+function escapePdfText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function wrapText(value: string, max = 88) {
+  const words = value.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length > max && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+function downloadPdf(filename: string, lines: string[]) {
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const margin = 48;
+  const lineHeight = 15;
+  const pages: string[][] = [[]];
+  let y = pageHeight - margin;
+
+  for (const line of lines.flatMap((item) => wrapText(item))) {
+    if (y < margin) {
+      pages.push([]);
+      y = pageHeight - margin;
+    }
+    pages[pages.length - 1].push(line);
+    y -= lineHeight;
+  }
+
+  const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>"];
+  const pageRefs: string[] = [];
+  const fontObjectNumber = 3 + pages.length * 2;
+
+  pages.forEach((pageLines, index) => {
+    const pageObj = 3 + index * 2;
+    const contentObj = pageObj + 1;
+    pageRefs.push(`${pageObj} 0 R`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentObj} 0 R >>`);
+    const text = [
+      "BT",
+      "/F1 10 Tf",
+      `${margin} ${pageHeight - margin} Td`,
+      ...pageLines.map((line, i) => `${i === 0 ? "" : `0 -${lineHeight} Td `}(${escapePdfText(line)}) Tj`),
+      "ET",
+    ].join("\n");
+    objects.push(`<< /Length ${text.length} >>\nstream\n${text}\nendstream`);
+  });
+
+  objects.splice(1, 0, `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pages.length} >>`);
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((obj, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${obj}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pdfText(
+  text: string,
+  x: number,
+  y: number,
+  options: { size?: number; font?: "F1" | "F2"; color?: [number, number, number] } = {},
+) {
+  const size = options.size || 10;
+  const font = options.font || "F1";
+  const color = options.color || [15, 23, 42];
+  return [
+    "BT",
+    `${(color[0] / 255).toFixed(3)} ${(color[1] / 255).toFixed(3)} ${(color[2] / 255).toFixed(3)} rg`,
+    `/${font} ${size} Tf`,
+    `${x} ${y} Td`,
+    `(${escapePdfText(text)}) Tj`,
+    "ET",
+  ].join("\n");
+}
+
+function pdfRect(x: number, y: number, width: number, height: number, color: [number, number, number]) {
+  return [
+    "q",
+    `${(color[0] / 255).toFixed(3)} ${(color[1] / 255).toFixed(3)} ${(color[2] / 255).toFixed(3)} rg`,
+    `${x} ${y} ${width} ${height} re`,
+    "f",
+    "Q",
+  ].join("\n");
+}
+
+function pdfLine(x1: number, y1: number, x2: number, y2: number, color: [number, number, number]) {
+  return [
+    "q",
+    `${(color[0] / 255).toFixed(3)} ${(color[1] / 255).toFixed(3)} ${(color[2] / 255).toFixed(3)} RG`,
+    "0.75 w",
+    `${x1} ${y1} m`,
+    `${x2} ${y2} l`,
+    "S",
+    "Q",
+  ].join("\n");
+}
+
+function buildPdf(filename: string, pageStreams: string[]) {
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const objects: string[] = ["<< /Type /Catalog /Pages 2 0 R >>"];
+  const pageRefs: string[] = [];
+  const fontRegularObject = 3 + pageStreams.length * 2;
+  const fontBoldObject = fontRegularObject + 1;
+
+  pageStreams.forEach((stream, index) => {
+    const pageObj = 3 + index * 2;
+    const contentObj = pageObj + 1;
+    pageRefs.push(`${pageObj} 0 R`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularObject} 0 R /F2 ${fontBoldObject} 0 R >> >> /Contents ${contentObj} 0 R >>`);
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+
+  objects.splice(1, 0, `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pageStreams.length} >>`);
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((obj, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${obj}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  const blob = new Blob([pdf], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadTranscriptPdf(data: TranscriptResponse) {
+  const s = data.session;
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const margin = 42;
+  const contentWidth = pageWidth - margin * 2;
+  const bubbleMaxWidth = 250;
+  const advisorId = s.advisor?._id;
+  const streams: string[] = [];
+  let commands: string[] = [];
+  let y = pageHeight - margin;
+
+  const addPage = () => {
+    if (commands.length) streams.push(commands.join("\n"));
+    commands = [];
+    y = pageHeight - margin;
+  };
+
+  const addHeader = () => {
+    commands.push(pdfText("Prophetic Pathway", margin, y, { size: 16, font: "F2", color: [10, 122, 144] }));
+    commands.push(pdfText("Chat Transcript", margin, y - 20, { size: 18, font: "F2" }));
+    commands.push(pdfText(`Session ${s.sessionCode || s._id}`, margin, y - 38, { size: 10, color: [71, 85, 105] }));
+    commands.push(pdfLine(margin, y - 54, pageWidth - margin, y - 54, [226, 232, 240]));
+    y -= 78;
+
+    commands.push(pdfRect(margin, y - 56, contentWidth, 56, [248, 250, 252]));
+    commands.push(pdfText(`${s.user?.name || "Client"} -> ${s.advisor?.name || "Advisor"}`, margin + 14, y - 20, { size: 11, font: "F2" }));
+    commands.push(pdfText(`${formatDate(s.endedAt || s.createdAt, true)} - ${data.messages.length} messages - ${s.status || "completed"}`, margin + 14, y - 38, { size: 9, color: [100, 116, 139] }));
+    y -= 84;
+  };
+
+  const ensureSpace = (height: number) => {
+    if (y - height < margin) {
+      addPage();
+      addHeader();
+    }
+  };
+
+  addHeader();
+
+  if (!data.messages.length) {
+    commands.push(pdfText("No messages in this conversation.", margin, y, { size: 11, color: [100, 116, 139] }));
+  }
+
+  for (const message of data.messages) {
+    const fromAdvisor = String(message.sender?._id) === String(advisorId);
+    const sender = message.sender?.name || "User";
+    const body = message.text || (message.attachments?.length ? "[attachment]" : "");
+    const bodyLines = wrapText(body, 42);
+    const metaLines = wrapText(`${sender} - ${formatDate(message.createdAt, true)}`, 40);
+    const bubbleHeight = 18 + metaLines.length * 11 + bodyLines.length * 14 + 10;
+    const bubbleWidth = bubbleMaxWidth;
+    const x = fromAdvisor ? margin : pageWidth - margin - bubbleWidth;
+    const bubbleColor: [number, number, number] = fromAdvisor ? [241, 245, 249] : [10, 122, 144];
+    const metaColor: [number, number, number] = fromAdvisor ? [100, 116, 139] : [214, 240, 246];
+    const textColor: [number, number, number] = fromAdvisor ? [15, 23, 42] : [255, 255, 255];
+
+    ensureSpace(bubbleHeight + 16);
+    commands.push(pdfRect(x, y - bubbleHeight, bubbleWidth, bubbleHeight, bubbleColor));
+    let textY = y - 18;
+    for (const line of metaLines) {
+      commands.push(pdfText(line, x + 12, textY, { size: 8, font: "F2", color: metaColor }));
+      textY -= 11;
+    }
+    textY -= 4;
+    for (const line of bodyLines) {
+      commands.push(pdfText(line, x + 12, textY, { size: 10, color: textColor }));
+      textY -= 14;
+    }
+    y -= bubbleHeight + 16;
+  }
+
+  streams.push(commands.join("\n"));
+  buildPdf(`transcript-${s.sessionCode || s._id}.pdf`, streams);
+}
 
 export default function RecordingsPage() {
   const toast = useToast();
@@ -97,6 +339,28 @@ export default function RecordingsPage() {
               {t.label}
             </button>
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search session, client, or advisor..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Select
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value as TabValue);
+              setPage(1);
+            }}
+          >
+            {TYPE_FILTERS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </Select>
         </div>
 
         {loading ? (
@@ -183,15 +447,21 @@ export default function RecordingsPage() {
                                 >
                                   <PlayIcon size={15} /> Play
                                 </button>
-                                <a
-                                  href={s.recordingUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  download
-                                  className="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50"
-                                >
-                                  Download
-                                </a>
+                                {s.recordingUrl ? (
+                                  <a
+                                    href={s.recordingUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download
+                                    className="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50"
+                                  >
+                                    Download
+                                  </a>
+                                ) : (
+                                  <span className="inline-flex items-center h-9 px-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+                                    Processing
+                                  </span>
+                                )}
                               </>
                             )}
                           </div>
@@ -299,25 +569,7 @@ function TranscriptModal({
 
   const download = () => {
     if (!data) return;
-    const s = data.session;
-    const lines = [
-      `Session: ${s.sessionCode || s._id}`,
-      `Client: ${s.user?.name || "Client"}`,
-      `Advisor: ${s.advisor?.name || "Advisor"}`,
-      `Date: ${formatDate(s.endedAt || s.createdAt, true)}`,
-      `Status: ${s.status || "—"}`,
-      "",
-      ...data.messages.map(
-        (m) => `[${formatDate(m.createdAt, true)}] ${m.sender?.name || "User"}: ${m.text || (m.attachments?.length ? "[attachment]" : "")}`
-      ),
-    ];
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transcript-${s.sessionCode || s._id}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadTranscriptPdf(data);
   };
 
   const advisorId = data?.session.advisor?._id;

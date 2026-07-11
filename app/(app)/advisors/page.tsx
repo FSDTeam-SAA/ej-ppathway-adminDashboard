@@ -10,7 +10,7 @@ import { Badge, StatusBadge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
-import { Input, Textarea } from "../../components/ui/Input";
+import { Input, Select, Textarea } from "../../components/ui/Input";
 import { Combobox } from "../../components/ui/Combobox";
 import { Button } from "../../components/ui/Button";
 import { EyeIcon, PlusIcon, StarIcon, SuspendIcon } from "../../components/Icons";
@@ -40,6 +40,7 @@ export default function AdvisorsPage() {
   const [items, setItems] = useState<AdvisorListItem[]>([]);
   const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -62,6 +63,7 @@ export default function AdvisorsPage() {
         limit,
         status: tab === "all" ? undefined : tab,
         q: q || undefined,
+        tier: tierFilter || undefined,
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
@@ -94,7 +96,7 @@ export default function AdvisorsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit, q]);
+  }, [tab, page, limit, q, tierFilter]);
 
   const handleSuspend = async () => {
     if (!confirm) return;
@@ -139,6 +141,40 @@ export default function AdvisorsPage() {
 
         <div className="mb-6">
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search name or email..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Select
+            value={tab}
+            onChange={(e) => {
+              setTab(e.target.value);
+              setPage(1);
+            }}
+          >
+            {TABS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </Select>
+          <Select
+            value={tierFilter}
+            onChange={(e) => {
+              setTierFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All Tiers</option>
+            <option value="silver">Silver</option>
+            <option value="gold">Gold</option>
+            <option value="platinum">Platinum</option>
+          </Select>
         </div>
 
         <BulkActionsBar

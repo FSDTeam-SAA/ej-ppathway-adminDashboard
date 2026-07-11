@@ -125,7 +125,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-slate-600 mt-1">
-              Welcome back to your Dashboard <span aria-hidden>👋</span>
+              Welcome back to your Dashboard
             </p>
           </div>
           <PeriodFilter value={period} onChange={setPeriod} />

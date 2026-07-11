@@ -10,7 +10,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/Skeleton";
 import { Modal, ConfirmDialog } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
-import { Textarea } from "../../components/ui/Input";
+import { Input, Select, Textarea } from "../../components/ui/Input";
 import { EyeIcon, ShieldIcon, PdfIcon, UploadIcon } from "../../components/Icons";
 import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
@@ -25,21 +25,34 @@ import type {
 } from "../../lib/types";
 import { MiniArea } from "../../components/charts";
 
-const TABS = [
+const COMPLAINT_TABS = [
   { value: "all", label: "All" },
   { value: "pending", label: "Pending" },
-  { value: "rejected", label: "Reject" },
+  { value: "reject", label: "Rejected" },
   { value: "complete", label: "Complete" },
 ];
 
 type ListMeta = {
   total?: number;
-  totals?: { all: number; solved: number; pending: number };
+  totals?: {
+    all: number;
+    open: number;
+    solved: number;
+    rejected: number;
+    totalDisputes: number;
+    openDisputes: number;
+    resolvedDisputes: number;
+    flaggedUsers: number;
+    flaggedAdvisors: number;
+  };
 };
 
 export default function CompliancePage() {
   const [section, setSection] = useState<"complaints" | "disputes">("complaints");
   const [q, setQ] = useState("");
+  const [period, setPeriod] = useState("month");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
 
   return (
     <>
@@ -79,20 +92,72 @@ export default function CompliancePage() {
             Disputes
           </button>
         </div>
-        {section === "complaints" ? <ComplaintsSection q={q} /> : <DisputesSection q={q} />}
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search user, advisor, or issue..."
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+          />
+          <Select value={section} onChange={(event) => setSection(event.target.value as "complaints" | "disputes")}>
+            <option value="complaints">Complaints</option>
+            <option value="disputes">Disputes</option>
+          </Select>
+        </div>
+        <div className="mb-6 flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-slate-500">Date Filter</span>
+            <select
+              value={period}
+              onChange={(event) => setPeriod(event.target.value)}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </label>
+          {period === "custom" ? (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">From</span>
+                <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">To</span>
+                <input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700" />
+              </label>
+            </>
+          ) : null}
+        </div>
+        {section === "complaints" ? (
+          <ComplaintsSection q={q} period={period} from={from} to={to} />
+        ) : (
+          <DisputesSection q={q} period={period} from={from} to={to} />
+        )}
       </main>
     </>
   );
 }
 
-function ComplaintsSection({ q }: { q: string }) {
+function ComplaintsSection({ q, period, from, to }: { q: string; period: string; from: string; to: string }) {
   const toast = useToast();
   const [tab, setTab] = useState("all");
   const [items, setItems] = useState<Complaint[]>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
-  const [totals, setTotals] = useState({ all: 0, solved: 0, pending: 0 });
+  const [totals, setTotals] = useState({
+    all: 0,
+    open: 0,
+    solved: 0,
+    rejected: 0,
+    totalDisputes: 0,
+    openDisputes: 0,
+    resolvedDisputes: 0,
+    flaggedUsers: 0,
+    flaggedAdvisors: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<Complaint | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
@@ -110,6 +175,9 @@ function ComplaintsSection({ q }: { q: string }) {
         limit,
         status: tab === "all" ? undefined : tab,
         q: q || undefined,
+        period: period === "custom" ? undefined : period,
+        from: period === "custom" ? from || undefined : undefined,
+        to: period === "custom" ? to || undefined : undefined,
       });
       setItems(r.data || []);
       const m = (r.meta || {}) as ListMeta;
@@ -142,12 +210,44 @@ function ComplaintsSection({ q }: { q: string }) {
     load();
   };
 
+  const bulkUpdateStatus = async (status: "complete" | "reject" | "reviewing") => {
+    if (bulk.selectedCount === 0) return;
+    setActionLoading(true);
+    const results = await Promise.allSettled(
+      bulk.selectedArray.map((id) => api.patch(`/admin/complaints/${id}`, { status, note: `Bulk ${status}` }))
+    );
+    setActionLoading(false);
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    if (ok) toast.success(`Updated ${ok} complaint${ok === 1 ? "" : "s"}`);
+    bulk.clear();
+    load();
+  };
+
+  const exportSelected = () => {
+    const rows = items.filter((item) => bulk.selectedIds.has(item._id));
+    const csv = [
+      ["Complaint ID", "Against User", "Submitted By", "Category", "Subject", "Session ID", "Priority", "Status", "Created"].join(","),
+      ...rows.map((c) => [
+        c._id,
+        c.advisor?.name || "",
+        c.user?.name || "",
+        complaintCategory(c.issueType),
+        complaintSubject(c),
+        c.session?.sessionCode || "",
+        priorityLevel(c),
+        complaintStatusLabel(c.status),
+        formatDate(c.createdAt, true),
+      ].map(csvCell).join(",")),
+    ].join("\n");
+    downloadCsv("complaints-export.csv", csv);
+  };
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit, q]);
+  }, [tab, page, limit, q, period, from, to]);
 
-  const updateStatus = async (status: "complete" | "rejected" | "reviewing") => {
+  const updateStatus = async (status: "complete" | "reject" | "reviewing") => {
     if (!details) return;
     setActionLoading(true);
     try {
@@ -167,14 +267,20 @@ function ComplaintsSection({ q }: { q: string }) {
 
   return (
     <div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <SummaryCard label="Total complain" value={totals.all} color="#86efac" icon={<ShieldIcon />} />
-          <SummaryCard label="Total Solved Complain" value={totals.solved} color="#60a5fa" icon={<ShieldIcon />} />
-          <SummaryCard label="Total Pending Complain" value={totals.pending} color="#fbbf24" icon={<ShieldIcon />} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+          <SummaryCard label="Total Complaints" value={totals.all} color="#86efac" icon={<ShieldIcon />} />
+          <SummaryCard label="Open Complaints" value={totals.open} color="#fbbf24" icon={<ShieldIcon />} />
+          <SummaryCard label="Resolved Complaints" value={totals.solved} color="#60a5fa" icon={<ShieldIcon />} />
+          <SummaryCard label="Rejected Complaints" value={totals.rejected} color="#f87171" icon={<ShieldIcon />} />
+          <SummaryCard label="Total Disputes" value={totals.totalDisputes} color="#38bdf8" icon={<ShieldIcon />} />
+          <SummaryCard label="Open Disputes" value={totals.openDisputes} color="#f59e0b" icon={<ShieldIcon />} />
+          <SummaryCard label="Resolved Disputes" value={totals.resolvedDisputes} color="#22c55e" icon={<ShieldIcon />} />
+          <SummaryCard label="Flagged Users" value={totals.flaggedUsers} color="#fb7185" icon={<ShieldIcon />} />
+          <SummaryCard label="Flagged Advisors" value={totals.flaggedAdvisors} color="#a78bfa" icon={<ShieldIcon />} />
         </div>
 
         <div className="mb-6">
-          <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
+          <Tabs tabs={COMPLAINT_TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
         <BulkActionsBar
@@ -182,6 +288,15 @@ function ComplaintsSection({ q }: { q: string }) {
           onClear={bulk.clear}
           onDelete={() => setBulkConfirm(true)}
         />
+        {bulk.selectedCount > 0 ? (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button size="sm" variant="success" loading={actionLoading} onClick={() => bulkUpdateStatus("complete")}>Bulk Approve</Button>
+            <Button size="sm" variant="danger" loading={actionLoading} onClick={() => bulkUpdateStatus("reject")}>Bulk Reject</Button>
+            <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => bulkUpdateStatus("reviewing")}>Bulk Assign</Button>
+            <Button size="sm" variant="outline" loading={actionLoading} onClick={() => bulkUpdateStatus("complete")}>Bulk Close</Button>
+            <Button size="sm" variant="outline" onClick={exportSelected}>Bulk Export</Button>
+          </div>
+        ) : null}
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           {loading ? (
@@ -199,19 +314,25 @@ function ComplaintsSection({ q }: { q: string }) {
                         onChange={bulk.toggleAll}
                       />
                     </th>
-                    <th className="px-5 py-4 font-medium">User Name</th>
-                    <th className="px-5 py-4 font-medium">User Mail</th>
-                    <th className="px-5 py-4 font-medium">Joined</th>
-                    <th className="px-5 py-4 font-medium">Sessions</th>
-                    <th className="px-5 py-4 font-medium">Payments</th>
-                    <th className="px-5 py-4 font-medium">Plan</th>
+                    <th className="px-5 py-4 font-medium">Against User</th>
+                    <th className="px-5 py-4 font-medium">Date Submitted</th>
+                    <th className="px-5 py-4 font-medium">Submitted By</th>
+                    <th className="px-5 py-4 font-medium">User Type</th>
+                    <th className="px-5 py-4 font-medium">User</th>
+                    <th className="px-5 py-4 font-medium">Complaint Category</th>
+                    <th className="px-5 py-4 font-medium">Complaint Subject</th>
+                    <th className="px-5 py-4 font-medium">Session ID</th>
+                    <th className="px-5 py-4 font-medium">Priority Level</th>
+                    <th className="px-5 py-4 font-medium">Status</th>
+                    <th className="px-5 py-4 font-medium">Assigned Admin</th>
+                    <th className="px-5 py-4 font-medium">Last Updated</th>
                     <th className="px-5 py-4 font-medium text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-10 text-slate-500">
+                      <td colSpan={14} className="text-center py-10 text-slate-500">
                         No complaints
                       </td>
                     </tr>
@@ -234,19 +355,23 @@ function ComplaintsSection({ q }: { q: string }) {
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
-                            <Avatar src={c.user?.profilePhoto} name={c.user?.name} size={32} />
-                            <span className="font-medium text-slate-900">{c.user?.name}</span>
+                            <Avatar src={c.advisor?.profilePhoto} name={c.advisor?.name || "Platform"} size={32} />
+                            <span className="font-medium text-slate-900">{c.advisor?.name || "Platform / Unknown"}</span>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-slate-600">{c.user?.email}</td>
-                        <td className="px-5 py-3 text-slate-600">{formatDate(c.createdAt)}</td>
+                        <td className="px-5 py-3 text-slate-600">{formatDate(c.createdAt, true)}</td>
+                        <td className="px-5 py-3 text-slate-600">{c.user?.name || "—"}</td>
+                        <td className="px-5 py-3 text-slate-700">{c.user?.role === "advisor" ? "Advisor" : "Client"}</td>
+                        <td className="px-5 py-3 text-slate-700">{c.user?.email || "—"}</td>
+                        <td className="px-5 py-3 text-slate-700">{complaintCategory(c.issueType)}</td>
+                        <td className="px-5 py-3 text-slate-700">{complaintSubject(c)}</td>
                         <td className="px-5 py-3 text-slate-700">{c.session?.sessionCode || "—"}</td>
-                        <td className="px-5 py-3 text-slate-700">
-                          {formatCurrency(c.session?.chargedAmount)}
-                        </td>
+                        <td className="px-5 py-3 text-slate-700">{priorityLevel(c)}</td>
                         <td className="px-5 py-3">
-                          <PlanCell status={c.status} />
+                          <ComplaintStatusBadge status={c.status} />
                         </td>
+                        <td className="px-5 py-3 text-slate-700">{c.resolvedBy?.name || "-"}</td>
+                        <td className="px-5 py-3 text-slate-600">{formatDate(c.updatedAt || c.createdAt, true)}</td>
                         <td className="px-5 py-3 text-right">
                           <button
                             type="button"
@@ -254,7 +379,7 @@ function ComplaintsSection({ q }: { q: string }) {
                             className="inline-flex items-center gap-1.5 text-[#0a7a90] hover:underline text-sm font-medium"
                           >
                             <EyeIcon size={16} />
-                            View Complain
+                            View Details
                           </button>
                         </td>
                       </tr>
@@ -282,8 +407,8 @@ function ComplaintsSection({ q }: { q: string }) {
             setDetails(null);
             setResolveOpen(false);
           }}
-          title="User Details"
-          size="md"
+          title="Complaint Details"
+          size="lg"
         >
           {details && (
             <div>
@@ -298,7 +423,48 @@ function ComplaintsSection({ q }: { q: string }) {
               </div>
 
               <Field label="Complaint Type" value={details.issueType} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                <Field label="Reporting User" value={`${details.user?.name || "-"} (${details.user?.email || "No email"})`} />
+                <Field label="Reported User" value={`${details.advisor?.name || "Platform / Unknown"} (${details.advisor?.email || "No email"})`} />
+                <Field label="Complaint Category" value={complaintCategory(details.issueType)} />
+                <Field label="Complaint Subject" value={complaintSubject(details)} />
+                <Field label="Date Submitted" value={formatDate(details.createdAt, true)} />
+                <Field label="Status" value={complaintStatusLabel(details.status)} />
+                <Field label="Priority Level" value={String(priorityLevel(details))} />
+                <Field label="Assigned Administrator" value={details.resolvedBy?.name || "-"} />
+                <Field label="Session ID" value={details.session?.sessionCode || "-"} />
+                <Field label="Session Type" value={sessionTypeLabel(details.session?.type)} />
+                <Field label="Date" value={sessionDate(details.session)} />
+                <Field label="Duration" value={sessionDuration(details.session)} />
+              </div>
               <Field label="Description" value={details.description || "—"} />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <a
+                  href={details.session?.recordingUrl || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`rounded-lg border px-3 py-3 text-sm font-medium ${
+                    details.session?.recordingUrl
+                      ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
+                      : "pointer-events-none border-slate-100 text-slate-400"
+                  }`}
+                >
+                  Session Recording
+                </a>
+                <a
+                  href={details.session?.transcriptUrl || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`rounded-lg border px-3 py-3 text-sm font-medium ${
+                    details.session?.transcriptUrl
+                      ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
+                      : "pointer-events-none border-slate-100 text-slate-400"
+                  }`}
+                >
+                  Session Transcript
+                </a>
+              </div>
 
               {details.documents && details.documents.length > 0 && (
                 <div className="mt-3">
@@ -325,6 +491,13 @@ function ComplaintsSection({ q }: { q: string }) {
                 </div>
               )}
 
+              <div className="mt-5 rounded-xl border border-slate-100 p-4">
+                <h3 className="text-sm font-bold text-slate-900 mb-3">Investigation Notes</h3>
+                <Field label="Internal Admin Notes" value={details.resolutionNote || "-"} />
+                <Field label="Assigned Administrator" value={details.resolvedBy?.name || "-"} />
+                <Field label="Resolution Notes" value={details.resolutionNote || "-"} />
+              </div>
+
               {!resolveOpen ? (
                 <div className="grid grid-cols-2 gap-3 mt-5">
                   <Button variant="outline" onClick={() => setDetails(null)}>
@@ -350,7 +523,7 @@ function ComplaintsSection({ q }: { q: string }) {
                     <Button
                       variant="danger"
                       loading={actionLoading}
-                      onClick={() => updateStatus("rejected")}
+                      onClick={() => updateStatus("reject")}
                     >
                       Reject
                     </Button>
@@ -400,7 +573,7 @@ const RESOLUTION_OPTIONS: { value: DisputeResolution; label: string }[] = [
   { value: "no_action", label: "No action" },
 ];
 
-function DisputesSection({ q }: { q: string }) {
+function DisputesSection({ q, period, from, to }: { q: string; period: string; from: string; to: string }) {
   const toast = useToast();
   const [tab, setTab] = useState<DisputeStatus | "all">("all");
   const [items, setItems] = useState<Dispute[]>([]);
@@ -417,6 +590,8 @@ function DisputesSection({ q }: { q: string }) {
   const [reassignAdvisorId, setReassignAdvisorId] = useState("");
   const [freeRescheduleAt, setFreeRescheduleAt] = useState("");
   const [note, setNote] = useState("");
+  const bulk = useBulkSelection(items);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -426,6 +601,9 @@ function DisputesSection({ q }: { q: string }) {
         limit,
         status: tab === "all" ? undefined : tab,
         q: q || undefined,
+        period,
+        from: period === "custom" ? from || undefined : undefined,
+        to: period === "custom" ? to || undefined : undefined,
       });
       setItems(r.data || []);
       setTotal(r.meta?.total || 0);
@@ -439,7 +617,7 @@ function DisputesSection({ q }: { q: string }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, page, limit, q]);
+  }, [tab, page, limit, q, period, from, to]);
 
   const closeAll = () => {
     setDetails(null);
@@ -520,6 +698,54 @@ function DisputesSection({ q }: { q: string }) {
     }
   };
 
+  const bulkPatch = async (path: string, body?: Record<string, unknown>) => {
+    if (!bulk.selectedCount) return;
+    setActionLoading(true);
+    try {
+      await Promise.all(bulk.selectedArray.map((id) => api.patch(`/admin/disputes/${id}/${path}`, body)));
+      toast.success("Bulk action completed");
+      bulk.clear();
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    setActionLoading(true);
+    try {
+      await Promise.all(bulk.selectedArray.map((id) => api.delete(`/admin/disputes/${id}`)));
+      toast.success("Deleted");
+      setBulkConfirm(false);
+      bulk.clear();
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const exportSelected = () => {
+    const selected = items.filter((item) => bulk.selectedIds.has(item._id));
+    const header = ["Client Name", "Advisor Name", "Dispute ID", "Session ID", "Session Type", "Amount Disputed", "Date Submitted", "Reason", "Status", "Assigned Admin"];
+    const rows = selected.map((d) => [
+      d.user?.name,
+      d.advisor?.name,
+      d._id,
+      d.session?.sessionCode,
+      sessionTypeLabel(d.session?.type),
+      d.session?.chargedAmount,
+      formatDate(d.createdAt, true),
+      disputeReason(d.disputeType),
+      d.status,
+      d.resolvedBy?.name,
+    ]);
+    downloadCsv("disputes-export.csv", [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"));
+  };
+
   const totals = {
     all: items.length,
     open: items.filter((d) => d.status === "open").length,
@@ -546,6 +772,21 @@ function DisputesSection({ q }: { q: string }) {
         />
       </div>
 
+      <BulkActionsBar
+        selectedCount={bulk.selectedCount}
+        onClear={bulk.clear}
+        onDelete={() => setBulkConfirm(true)}
+      />
+      {bulk.selectedCount > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button size="sm" variant="success" loading={actionLoading} onClick={() => bulkPatch("resolve", { resolution: "no_action", note: "Bulk approved" })}>Bulk Approve</Button>
+          <Button size="sm" variant="danger" loading={actionLoading} onClick={() => bulkPatch("reject", { note: "Bulk rejected" })}>Bulk Reject</Button>
+          <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => bulkPatch("investigating")}>Bulk Assign</Button>
+          <Button size="sm" variant="outline" loading={actionLoading} onClick={() => bulkPatch("resolve", { resolution: "no_action", note: "Bulk closed" })}>Bulk Close</Button>
+          <Button size="sm" variant="outline" onClick={exportSelected}>Bulk Export</Button>
+        </div>
+      ) : null}
+
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
           <TableSkeleton rows={8} cols={6} />
@@ -554,25 +795,46 @@ function DisputesSection({ q }: { q: string }) {
             <table className="w-full text-sm">
               <thead className="text-left text-slate-500">
                 <tr className="border-b border-slate-100">
-                  <th className="px-5 py-4 font-medium">User</th>
-                  <th className="px-5 py-4 font-medium">Advisor</th>
-                  <th className="px-5 py-4 font-medium">Type</th>
-                  <th className="px-5 py-4 font-medium">Session</th>
-                  <th className="px-5 py-4 font-medium">Opened</th>
+                  <th className="pl-5 pr-2 py-4 font-medium w-10">
+                    <BulkCheckbox
+                      ariaLabel="Select all disputes on this page"
+                      checked={bulk.allSelected}
+                      indeterminate={bulk.someSelected}
+                      onChange={bulk.toggleAll}
+                    />
+                  </th>
+                  <th className="px-5 py-4 font-medium">Client Name</th>
+                  <th className="px-5 py-4 font-medium">Advisor Name</th>
+                  <th className="px-5 py-4 font-medium">Dispute ID</th>
+                  <th className="px-5 py-4 font-medium">Session ID</th>
+                  <th className="px-5 py-4 font-medium">Session Type</th>
+                  <th className="px-5 py-4 font-medium">Amount Disputed</th>
+                  <th className="px-5 py-4 font-medium">Date Submitted</th>
+                  <th className="px-5 py-4 font-medium">Reason</th>
                   <th className="px-5 py-4 font-medium">Status</th>
+                  <th className="px-5 py-4 font-medium">Assigned Admin</th>
                   <th className="px-5 py-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-slate-500">
+                    <td colSpan={12} className="text-center py-10 text-slate-500">
                       No disputes
                     </td>
                   </tr>
                 ) : (
-                  items.map((d) => (
-                    <tr key={d._id} className="border-b border-slate-50 last:border-0">
+                  items.map((d) => {
+                    const selected = bulk.isSelected(d._id);
+                    return (
+                    <tr key={d._id} className={`border-b border-slate-50 last:border-0 ${selected ? "bg-amber-50/60" : ""}`}>
+                      <td className="pl-5 pr-2 py-3 w-10">
+                        <BulkCheckbox
+                          ariaLabel={`Select ${d.user?.name || "dispute"}`}
+                          checked={selected}
+                          onChange={() => bulk.toggle(d._id)}
+                        />
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar
@@ -585,21 +847,17 @@ function DisputesSection({ q }: { q: string }) {
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-slate-700">
-                        {d.advisor?.name || "—"}
-                      </td>
-                      <td className="px-5 py-3 text-slate-700 capitalize">
-                        {d.disputeType?.replace(/_/g, " ") || "—"}
-                      </td>
-                      <td className="px-5 py-3 text-slate-700">
-                        {d.session?.sessionCode || "—"}
-                      </td>
-                      <td className="px-5 py-3 text-slate-600">
-                        {formatDate(d.createdAt)}
-                      </td>
+                      <td className="px-5 py-3 text-slate-700">{d.advisor?.name || "-"}</td>
+                      <td className="px-5 py-3 text-slate-700">{d._id}</td>
+                      <td className="px-5 py-3 text-slate-700">{d.session?.sessionCode || "-"}</td>
+                      <td className="px-5 py-3 text-slate-700">{sessionTypeLabel(d.session?.type)}</td>
+                      <td className="px-5 py-3 text-slate-700">{formatCurrency(d.session?.chargedAmount)}</td>
+                      <td className="px-5 py-3 text-slate-600">{formatDate(d.createdAt, true)}</td>
+                      <td className="px-5 py-3 text-slate-700">{disputeReason(d.disputeType)}</td>
                       <td className="px-5 py-3">
                         <DisputeStatusBadge status={d.status} />
                       </td>
+                      <td className="px-5 py-3 text-slate-700">{d.resolvedBy?.name || "-"}</td>
                       <td className="px-5 py-3 text-right">
                         <button
                           type="button"
@@ -607,11 +865,12 @@ function DisputesSection({ q }: { q: string }) {
                           className="inline-flex items-center gap-1.5 text-[#0a7a90] hover:underline text-sm font-medium"
                         >
                           <EyeIcon size={16} />
-                          View
+                          View Details
                         </button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -634,8 +893,8 @@ function DisputesSection({ q }: { q: string }) {
       <Modal
         open={!!details && !resolveOpen && !rejectOpen}
         onClose={closeAll}
-        title="Dispute details"
-        size="md"
+        title="Dispute Details"
+        size="lg"
       >
         {details && (
           <div>
@@ -661,11 +920,49 @@ function DisputesSection({ q }: { q: string }) {
               label="Type"
               value={(details.disputeType || "—").replace(/_/g, " ")}
             />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+              <Field label="Session ID" value={details.session?.sessionCode || "-"} />
+              <Field label="Session Type" value={sessionTypeLabel(details.session?.type)} />
+              <Field label="Date" value={sessionDate(details.session)} />
+              <Field label="Duration" value={sessionDuration(details.session)} />
+              <Field label="Session Date" value={sessionDate(details.session)} />
+              <Field label="Amount Charged" value={formatCurrency(details.session?.chargedAmount)} />
+              <Field label="Amount Disputed" value={formatCurrency(details.session?.chargedAmount)} />
+              <Field label="Assigned Admin" value={details.resolvedBy?.name || "-"} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+              <a
+                href={details.session?.recordingUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={`rounded-lg border px-3 py-3 text-sm font-medium ${
+                  details.session?.recordingUrl
+                    ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
+                    : "pointer-events-none border-slate-100 text-slate-400"
+                }`}
+              >
+                Session Recording
+              </a>
+              <a
+                href={details.session?.transcriptUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={`rounded-lg border px-3 py-3 text-sm font-medium ${
+                  details.session?.transcriptUrl
+                    ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
+                    : "pointer-events-none border-slate-100 text-slate-400"
+                }`}
+              >
+                Session Transcript
+              </a>
+            </div>
             <Field
               label="Expected resolution"
               value={(details.expectedResolution || "—").replace(/_/g, " ")}
             />
             <Field label="Details" value={details.details || "—"} />
+            <Field label="User Statements" value={details.details || "-"} />
+            <Field label="Advisor Response" value={details.resolutionNote || "-"} />
             <Field label="Advisor" value={details.advisor?.name || "—"} />
             <Field
               label="Session"
@@ -720,7 +1017,7 @@ function DisputesSection({ q }: { q: string }) {
                     loading={actionLoading}
                     onClick={markInvestigating}
                   >
-                    Mark Investigating
+                    Escalate Case
                   </Button>
                 )}
                 <Button
@@ -737,7 +1034,7 @@ function DisputesSection({ q }: { q: string }) {
                     details.status === "open" ? "col-span-2" : "col-span-1"
                   }
                 >
-                  Resolve
+                  Approve / Reschedule
                 </Button>
               </div>
             )}
@@ -875,6 +1172,17 @@ function DisputesSection({ q }: { q: string }) {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={bulkConfirm}
+        onClose={() => setBulkConfirm(false)}
+        onConfirm={handleBulkDelete}
+        title={`Delete ${bulk.selectedCount} dispute${bulk.selectedCount === 1 ? "" : "s"}?`}
+        description="This permanently removes the selected disputes and cannot be undone."
+        confirmText="Delete"
+        danger
+        loading={actionLoading}
+      />
     </div>
   );
 }
@@ -933,4 +1241,95 @@ function Field({ label, value }: { label: string; value: string }) {
       </div>
     </div>
   );
+}
+
+function labelize(value?: string) {
+  if (!value) return "-";
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function complaintCategory(issueType?: string) {
+  const issue = (issueType || "").toLowerCase();
+  if (issue.includes("misleading") || issue.includes("fake") || issue.includes("false")) return "Misleading Information";
+  if (issue.includes("technical") || issue.includes("failed") || issue.includes("failure")) return "Technical Issue";
+  if (issue.includes("refund") || issue.includes("cancelled_after_payment")) return "Refund Request";
+  if (issue.includes("payment") || issue.includes("charge") || issue.includes("billing") || issue.includes("money")) return "Billing Issue";
+  return "Other";
+}
+
+function complaintSubject(complaint: Complaint) {
+  return labelize(complaint.issueType);
+}
+
+function priorityLevel(complaint: Complaint) {
+  const issue = `${complaint.kind} ${complaint.issueType}`.toLowerCase();
+  if (issue.includes("safety") || issue.includes("threat") || issue.includes("harassment") || issue.includes("abusive") || issue.includes("fraud") || issue.includes("privacy")) return 1;
+  if (issue.includes("payment") || issue.includes("refund") || issue.includes("charge") || issue.includes("billing")) return 2;
+  return 3;
+}
+
+function complaintStatusLabel(status?: string) {
+  if (status === "pending") return "New";
+  if (status === "reviewing") return "Under Review";
+  if (status === "complete") return "Resolved";
+  if (status === "reject" || status === "rejected") return "Rejected";
+  return labelize(status);
+}
+
+function ComplaintStatusBadge({ status }: { status?: string }) {
+  if (status === "pending") return <Badge tone="warning">New</Badge>;
+  if (status === "reviewing") return <Badge tone="info">Under Review</Badge>;
+  if (status === "complete") return <Badge tone="success">Resolved</Badge>;
+  if (status === "reject" || status === "rejected") return <Badge tone="danger">Rejected</Badge>;
+  return <Badge>{status || "-"}</Badge>;
+}
+
+function disputeReason(disputeType?: string) {
+  const type = (disputeType || "").toLowerCase();
+  if (type.includes("billing") || type.includes("payment") || type.includes("charge")) return "Billing Error";
+  if (type.includes("technical") || type.includes("failed")) return "Technical Failure";
+  if (type.includes("unauthorized")) return "Unauthorized Charge";
+  if (type.includes("conduct") || type.includes("advisor")) return "Advisor Conduct";
+  if (type.includes("session") && type.includes("not")) return "Session Did Not Occur";
+  if (type.includes("quality")) return "Service Quality";
+  return labelize(disputeType);
+}
+
+function sessionTypeLabel(type?: string) {
+  if (type === "call" || type === "voice") return "Voice Call";
+  if (type === "video") return "Video Call";
+  if (type === "chat") return "Chat";
+  return labelize(type);
+}
+
+function sessionDuration(session?: Complaint["session"] | Dispute["session"]) {
+  if (!session) return "-";
+  if (typeof session.actualDurationSec === "number") {
+    const minutes = Math.floor(session.actualDurationSec / 60);
+    const seconds = session.actualDurationSec % 60;
+    return minutes ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  }
+  if (typeof session.durationMinutes === "number") return `${session.durationMinutes}m`;
+  return "-";
+}
+
+function sessionDate(session?: Complaint["session"] | Dispute["session"]) {
+  return formatDate(session?.startedAt || session?.scheduledFor || "", true);
+}
+
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

@@ -11,6 +11,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { TableSkeleton } from "../../components/Skeleton";
 import { EyeIcon } from "../../components/Icons";
 import { ConfirmDialog } from "../../components/ui/Modal";
+import { Input, Select } from "../../components/ui/Input";
 import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError } from "../../lib/api";
@@ -105,6 +106,28 @@ export default function AdvisorApprovalsPage() {
 
         <div className="mb-6">
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search applicant, email, or expertise..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Select
+            value={tab}
+            onChange={(e) => {
+              setTab(e.target.value);
+              setPage(1);
+            }}
+          >
+            {TABS.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </Select>
         </div>
 
         <BulkActionsBar

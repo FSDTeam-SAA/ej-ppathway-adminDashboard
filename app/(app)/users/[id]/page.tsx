@@ -244,7 +244,10 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <section className="mb-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-3">Transaction & Refund History</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">Transactions & Credit Refunds</h3>
+              <p className="mb-3 text-sm text-slate-500">
+                Credit purchases, session charges, advisor earnings, platform commissions, and credit refunds.
+              </p>
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                 {(data.recentTransactions || []).length > 0 ? (
                   <div className="divide-y divide-slate-100">
@@ -265,7 +268,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
               </div>
               {(data.refunds || []).length > 0 && (
                 <p className="mt-2 text-sm text-slate-500">
-                  Refunds issued: {(data.refunds || []).length}
+                  Credit refunds issued: {(data.refunds || []).length}
                 </p>
               )}
             </section>

@@ -285,6 +285,8 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                           <option value="pending_review">Pending Review</option>
                           <option value="live_interview">Live Interview</option>
                           <option value="under_review">Under Review</option>
+                          {data.status === "approved" ? <option value="approved">Approved</option> : null}
+                          {data.status === "rejected" ? <option value="rejected">Not Selected</option> : null}
                         </select>
                       </label>
                     </div>
@@ -319,9 +321,9 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-slate-900 mb-3">Expertise & Categories</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ChipsField label="Skills/Expertise" items={data.expertise || []} />
-                  <ChipsField label="Styles" items={data.styles || []} />
-                  <ChipsField label="Languages" items={data.languages || []} />
+                  <ChipsField label="Skills/Expertise" items={profileItems(data, "expertise")} />
+                  <ChipsField label="Styles" items={profileItems(data, "styles")} />
+                  <ChipsField label="Languages" items={profileItems(data, "languages")} />
                 </div>
               </div>
 
@@ -349,19 +351,28 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
             {/* Right sidebar */}
             <div className="space-y-6">
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">Intro media</h3>
-                {data.introVideoUrl ? (
-                  isAudioMediaUrl(data.introVideoUrl) ? (
-                    <div className="aspect-video rounded-xl bg-slate-100 flex items-center px-4">
-                      <audio src={data.introVideoUrl} controls className="w-full" />
-                    </div>
-                  ) : (
-                    <video
-                      src={data.introVideoUrl}
-                      controls
-                      className="w-full aspect-video rounded-xl bg-slate-200"
-                    />
-                  )
+                <h3 className="text-lg font-semibold text-slate-900 mb-3">Application media</h3>
+                {applicationAudioUrl(data) || applicationIntroVideoUrl(data) ? (
+                  <div className="space-y-3">
+                    {applicationAudioUrl(data) ? (
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-slate-500">Listen to Message</div>
+                        <div className="rounded-xl bg-slate-100 px-4 py-5">
+                          <audio src={applicationAudioUrl(data)} controls className="w-full" />
+                        </div>
+                      </div>
+                    ) : null}
+                    {applicationIntroVideoUrl(data) ? (
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-slate-500">Intro Video</div>
+                        <video
+                          src={applicationIntroVideoUrl(data)}
+                          controls
+                          className="w-full aspect-video rounded-xl bg-slate-200"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div className="aspect-video rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-sm">
                     No intro media
@@ -728,10 +739,30 @@ function ChipsField({ label, items }: { label: string; items: string[] }) {
 }
 
 function toApplicationStatusValue(data: AdvisorApplication) {
+  if (data.status === "approved") return "approved";
+  if (data.status === "rejected") return "rejected";
   if (data.status === "pending_review") return "pending_review";
   if (data.status === "live_interview" || data.status === "scheduled") return "live_interview";
   if (data.status === "under_review") return "under_review";
   return "new";
+}
+
+function profileItems(
+  data: AdvisorApplication,
+  field: "expertise" | "styles" | "languages",
+) {
+  const profileValue = data.profile?.[field];
+  if (Array.isArray(profileValue) && profileValue.length > 0) return profileValue;
+  return data[field] || [];
+}
+
+function applicationAudioUrl(data: AdvisorApplication) {
+  return data.profile?.audioMessageUrl || data.audioMessageUrl || (data.introVideoUrl && isAudioMediaUrl(data.introVideoUrl) ? data.introVideoUrl : "");
+}
+
+function applicationIntroVideoUrl(data: AdvisorApplication) {
+  const url = data.profile?.introVideoUrl || data.introVideoUrl || "";
+  return url && !isAudioMediaUrl(url) ? url : "";
 }
 
 function yesNoLabel(value?: string) {

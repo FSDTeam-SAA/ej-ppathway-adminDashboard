@@ -129,6 +129,11 @@ export type AdvisorScheduleSlot = {
   to?: string;
 };
 
+export type AdvisorDateAvailability = {
+  unavailable?: boolean;
+  slots?: AdvisorScheduleSlot[];
+};
+
 export type AdvisorDaySchedule = {
   enabled?: boolean;
   from?: string;
@@ -146,6 +151,7 @@ export interface AdvisorProfile {
   expertise?: string[];
   styles?: string[];
   languages?: string[];
+  audioMessageUrl?: string;
   introVideoUrl?: string;
   pricing?: AdvisorPricing;
   avgRating?: number;
@@ -159,6 +165,8 @@ export interface AdvisorProfile {
   lastSeenAt?: string;
   autoOnlineMode?: boolean;
   weeklySchedule?: Record<string, AdvisorDaySchedule>;
+  dateAvailability?: Record<string, AdvisorDateAvailability>;
+  updatedAt?: string;
 }
 
 export interface AdvisorMetrics {
@@ -184,6 +192,7 @@ export interface AdvisorMetrics {
     isOnline: boolean;
     availableNow: boolean;
     weeklySchedule: Record<string, AdvisorDaySchedule> | null;
+    dateAvailability?: Record<string, AdvisorDateAvailability> | null;
   };
 }
 
@@ -217,9 +226,11 @@ export interface AdvisorApplication {
   yearsOfExperience?: string;
   availableFiveHoursPerDay?: string;
   baptizedInHolySpirit?: string;
+  profile?: AdvisorProfile | null;
   expertise?: string[];
   styles?: string[];
   languages?: string[];
+  audioMessageUrl?: string;
   introVideoUrl?: string;
   pricing?: AdvisorPricing;
   preRecordedAnswers?: Array<{ question: string; answer: string }>;
@@ -262,6 +273,7 @@ export interface SessionItem {
   sessionCode?: string;
   user?: AdminUser & { profilePhoto?: string };
   advisor?: AdminUser & { profilePhoto?: string };
+  advisorTier?: "silver" | "gold" | "platinum" | string;
   type?: "chat" | "call" | "video";
   status?:
     | "pending"
@@ -274,6 +286,7 @@ export interface SessionItem {
   duration?: number;
   durationMinutes?: number;
   actualDurationSec?: number;
+  scheduledFor?: string;
   startedAt?: string;
   endedAt?: string;
   chargedAmount?: number;
@@ -281,11 +294,15 @@ export interface SessionItem {
   refundIssued?: number;
   cancelReason?: string;
   cancelledAt?: string;
+  flagReason?: string;
+  flaggedAt?: string;
+  internalNotes?: string;
   createdAt: string;
   recordingUrl?: string;
   transcriptUrl?: string;
   hasTranscript?: boolean;
   messageCount?: number;
+  estimatedCost?: number;
   egressId?: string;
   livekitRoom?: string;
 }
@@ -308,13 +325,28 @@ export interface Complaint {
   kind: "complain" | "safety_report";
   user?: AdminUser;
   advisor?: AdminUser;
-  session?: { _id: string; sessionCode?: string; type?: string; chargedAmount?: number };
+  session?: {
+    _id: string;
+    sessionCode?: string;
+    type?: string;
+    chargedAmount?: number;
+    actualDurationSec?: number;
+    durationMinutes?: number;
+    scheduledFor?: string;
+    startedAt?: string;
+    endedAt?: string;
+    recordingUrl?: string;
+    transcriptUrl?: string;
+    status?: string;
+  };
   issueType: string;
   description?: string;
   documents?: string[];
-  status: "pending" | "reviewing" | "complete" | "rejected";
+  status: "pending" | "reviewing" | "complete" | "reject" | "rejected";
   resolutionNote?: string;
+  resolvedBy?: AdminUser;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type DisputeStatus =
@@ -335,7 +367,20 @@ export interface Dispute {
   _id: string;
   user?: AdminUser;
   advisor?: AdminUser;
-  session?: { _id: string; sessionCode?: string; type?: string; chargedAmount?: number };
+  session?: {
+    _id: string;
+    sessionCode?: string;
+    type?: string;
+    chargedAmount?: number;
+    actualDurationSec?: number;
+    durationMinutes?: number;
+    scheduledFor?: string;
+    startedAt?: string;
+    endedAt?: string;
+    recordingUrl?: string;
+    transcriptUrl?: string;
+    status?: string;
+  };
   disputeType: string;
   details?: string;
   expectedResolution: DisputeResolution;
@@ -344,8 +389,10 @@ export interface Dispute {
   refundAmount?: number;
   resolutionApplied?: DisputeResolution;
   resolutionNote?: string;
+  resolvedBy?: AdminUser;
   resolvedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Transaction {

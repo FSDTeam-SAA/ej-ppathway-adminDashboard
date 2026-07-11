@@ -34,7 +34,10 @@ const ITEMS: Item[] = [
   { href: "/website-management/how-it-works", label: "How it Works", icon: ContentIcon, group: "Pages" },
   { href: "/website-management/advisors", label: "Advisors List", icon: AdvisorIcon, group: "Pages" },
   { href: "/website-management/advisor-detail", label: "Advisor Detail", icon: AdvisorIcon, group: "Pages" },
+  { href: "/website-management/login", label: "Login", icon: ContentIcon, group: "Forms" },
+  { href: "/website-management/signup", label: "Sign Up", icon: ContentIcon, group: "Forms" },
   { href: "/website-management/join-as-advisor", label: "Join as Advisor", icon: ApproveIcon, group: "Pages" },
+  { href: "/website-management/advisor-application", label: "Advisor Application", icon: ApproveIcon, group: "Forms" },
   { href: "/website-management/ethical-standards", label: "Ethical Standards", icon: ShieldIcon, group: "Pages" },
   { href: "/website-management/reviews", label: "Reviews / Satisfaction", icon: StarIcon, group: "Pages" },
   { href: "/website-management/blogs", label: "Blogs", icon: ContentIcon, group: "Pages" },
@@ -48,7 +51,7 @@ const ITEMS: Item[] = [
   { href: "/website-management/inbox", label: "Inbox (Contact)", icon: ChatIcon, group: "Submissions" }
 ];
 
-const GROUPS = ["General", "Pages", "Curation", "Submissions"] as const;
+const GROUPS = ["General", "Pages", "Forms", "Curation", "Submissions"] as const;
 
 export default function WebsiteManagementLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

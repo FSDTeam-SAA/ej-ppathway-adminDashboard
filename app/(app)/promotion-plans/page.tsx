@@ -44,6 +44,8 @@ export default function PromotionPlansPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<PromotionPlan | null>(null);
   const [deleteRow, setDeleteRow] = useState<PromotionPlan | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -67,6 +69,14 @@ export default function PromotionPlansPage() {
     const revenue = plans.reduce((sum, plan) => sum + Number(plan.price || 0), 0);
     return { active, revenue };
   }, [plans]);
+  const filteredPlans = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return plans.filter((plan) => {
+      const matchesSearch = !term || [plan.label, plan.id, ...plan.features].some((value) => value.toLowerCase().includes(term));
+      const matchesStatus = !statusFilter || (statusFilter === "active" ? plan.isActive : !plan.isActive);
+      return matchesSearch && matchesStatus;
+    });
+  }, [plans, search, statusFilter]);
 
   const savePlan = async (plan: PromotionPlan) => {
     const error = validatePlan(plan, plans);
@@ -136,6 +146,19 @@ export default function PromotionPlansPage() {
           <Stat label="Listed value" value={`$${stats.revenue.toLocaleString()}`} />
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search plans, IDs, or features..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="hidden">Hidden</option>
+          </Select>
+        </div>
+
         <section className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-900">Advisor Promotion Tools</h2>
@@ -146,7 +169,7 @@ export default function PromotionPlansPage() {
 
           {loading ? (
             <div className="h-72 animate-pulse bg-slate-50" />
-          ) : plans.length === 0 ? (
+          ) : filteredPlans.length === 0 ? (
             <div className="p-10 text-center text-slate-500">No promotion plans yet.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -162,7 +185,7 @@ export default function PromotionPlansPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {plans.map((plan) => (
+                  {filteredPlans.map((plan) => (
                     <tr key={plan.id} className="border-t border-slate-100">
                       <td className="px-5 py-4">
                         <div className="font-semibold text-slate-900">{plan.label}</div>

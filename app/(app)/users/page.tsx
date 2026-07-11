@@ -6,7 +6,8 @@ import { PageHeader } from "../../components/PageHeader";
 import { Avatar } from "../../components/ui/Avatar";
 import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
-import { ConfirmDialog } from "../../components/ui/Modal";
+import { ConfirmDialog, Modal } from "../../components/ui/Modal";
+import { Input, Select } from "../../components/ui/Input";
 import { TableSkeleton } from "../../components/Skeleton";
 import {
   BulkActionsBar,
@@ -54,10 +55,13 @@ export default function UsersListPage() {
   });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [confirm, setConfirm] = useState<UserListItem | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "" });
   const [actionLoading, setActionLoading] = useState(false);
 
   const bulk = useBulkSelection(items);
@@ -71,6 +75,7 @@ export default function UsersListPage() {
         page,
         limit,
         q: q || undefined,
+        status: statusFilter || undefined,
       });
       const r = res as unknown as ListResponse;
       setItems(r.data || []);
@@ -92,7 +97,7 @@ export default function UsersListPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, limit, q]);
+  }, [page, limit, q, statusFilter]);
 
   const handleSuspend = async () => {
     if (!confirm) return;
@@ -131,6 +136,26 @@ export default function UsersListPage() {
     load();
   };
 
+  const createUser = async () => {
+    if (!newUser.name.trim() || !newUser.email.trim() || !newUser.password.trim()) {
+      toast.error("Name, email, and password are required");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await api.post("/admin/users", newUser);
+      toast.success("User created");
+      setAddOpen(false);
+      setNewUser({ name: "", email: "", phone: "", password: "" });
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to create user";
+      toast.error(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <>
       <Topbar
@@ -147,6 +172,16 @@ export default function UsersListPage() {
             { label: "Users Management" },
           ]}
         />
+
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="inline-flex h-10 items-center rounded-lg bg-[#0a7a90] px-4 text-sm font-semibold text-white hover:bg-[#076377]"
+          >
+            A New User
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <SummaryCard
@@ -170,6 +205,30 @@ export default function UsersListPage() {
             iconBg="bg-rose-100 text-rose-600"
             color="#fb7185"
           />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+          <Input
+            placeholder="Search name, email, phone..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+          />
+          <Select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="pending_verification">Pending Verification</option>
+            <option value="suspended">Suspended</option>
+            <option value="deactivated">Deactivated</option>
+          </Select>
         </div>
 
         <BulkActionsBar
@@ -327,6 +386,50 @@ export default function UsersListPage() {
           danger
           loading={actionLoading}
         />
+
+        <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add New User" size="md">
+          <div className="grid grid-cols-1 gap-4">
+            <Input
+              label="Name *"
+              value={newUser.name}
+              onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
+            />
+            <Input
+              label="Email *"
+              type="email"
+              value={newUser.email}
+              onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
+            />
+            <Input
+              label="Phone"
+              value={newUser.phone}
+              onChange={(e) => setNewUser((u) => ({ ...u, phone: e.target.value }))}
+            />
+            <Input
+              label="Temporary Password *"
+              type="password"
+              value={newUser.password}
+              onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
+            />
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setAddOpen(false)}
+                className="h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={createUser}
+                disabled={actionLoading}
+                className="h-10 rounded-lg bg-[#0a7a90] text-sm font-semibold text-white hover:bg-[#076377] disabled:opacity-60"
+              >
+                {actionLoading ? "Creating..." : "Add User"}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </main>
     </>
   );

@@ -14,7 +14,15 @@ import { Combobox } from "../../../components/ui/Combobox";
 import { api, ApiError } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatCurrency, formatDate, formatRelative } from "../../../lib/format";
-import type { AdvisorProfile, AdminUser, Wallet, AdvisorMetrics } from "../../../lib/types";
+import type {
+  AdvisorDateAvailability,
+  AdvisorDaySchedule,
+  AdvisorProfile,
+  AdvisorScheduleSlot,
+  AdminUser,
+  Wallet,
+  AdvisorMetrics,
+} from "../../../lib/types";
 import {
   ADVISOR_EXPERTISE_OPTIONS,
   ADVISOR_STYLE_OPTIONS,
@@ -31,6 +39,13 @@ import {
   MessageSquare,
   KeyRound,
   Award,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useCountries, useCities, useCountryName, formatLocation } from "../../../lib/countries";
 
@@ -138,7 +153,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const p = data?.profile;
   const m = data?.metrics;
   const pricing = p?.pricing;
-  const schedule = m?.availability.weeklySchedule || p?.weeklySchedule || null;
 
   return (
     <>
@@ -315,56 +329,12 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
 
             {/* ===== Availability ===== */}
             <Section title="Availability">
-              <div className="flex flex-wrap gap-3 mb-5">
-                <span
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${
-                    m?.availability.isOnline
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${
-                      m?.availability.isOnline ? "bg-emerald-500" : "bg-slate-400"
-                    }`}
-                  />
-                  {m?.availability.isOnline ? "Online" : "Offline"}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${
-                    m?.availability.availableNow
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  <Clock size={15} />
-                  {m?.availability.availableNow ? "Available Now" : "Not Available Now"}
-                </span>
-              </div>
-              <div className="text-sm font-medium text-slate-500 mb-3">Weekly Availability Schedule</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {DAY_ORDER.map((day) => {
-                  const slot = schedule?.[day];
-                  const enabled = slot && slot.enabled !== false && (slot.from || slot.to);
-                  return (
-                    <div
-                      key={day}
-                      className="flex items-center justify-between border border-slate-100 rounded-xl px-4 py-3"
-                    >
-                      <span className="capitalize text-slate-700">{day}</span>
-                      {enabled ? (
-                        <span className="text-[#0a7a90] font-medium text-right">
-                          {slot?.slots?.length
-                            ? slot.slots.map((s) => `${s.from || "-"} - ${s.to || "-"}`).join(", ")
-                            : `${slot?.from || "N/A"} - ${slot?.to || "N/A"}`}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-sm">Unavailable</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <AdminAvailabilityCalendar
+                advisorId={id}
+                profile={p}
+                metrics={m}
+                onSaved={load}
+              />
             </Section>
 
             {/* ===== Action Center ===== */}
@@ -453,6 +423,490 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+const CALENDAR_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const WEEKDAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DEFAULT_NEW_SLOT = { from: "09:00", to: "10:00" };
+
+type AvailabilityProfile = {
+  isOnline: boolean;
+  autoOnlineMode: boolean;
+  weeklySchedule: Record<string, AvailabilityDaySchedule>;
+  dateAvailability: Record<string, DateAvailabilityRule>;
+};
+type AvailabilityDaySchedule = { enabled: boolean; from: string; to: string; slots: RequiredSlot[] };
+type RequiredSlot = { from: string; to: string };
+type DateAvailabilityRule = { unavailable?: boolean; slots?: RequiredSlot[] };
+
+function AdminAvailabilityCalendar({
+  advisorId,
+  profile,
+  metrics,
+  onSaved,
+}: {
+  advisorId: string;
+  profile?: AdvisorProfile | null;
+  metrics?: AdvisorMetrics;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const [availability, setAvailability] = useState(() => normalizeAvailabilityProfile(profile));
+  const [viewMonth, setViewMonth] = useState(() => monthStart(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [applyDate, setApplyDate] = useState(() => dateKey(new Date()));
+
+  useEffect(() => {
+    setAvailability(normalizeAvailabilityProfile(profile));
+  }, [profile?._id, profile?.updatedAt]);
+
+  const dateAvailability = availability.dateAvailability || {};
+  const hasDateOverride = (key: string) => Object.prototype.hasOwnProperty.call(dateAvailability, key);
+  const getWeeklySlots = (key: string): RequiredSlot[] => {
+    const date = parseDateKey(key);
+    const weekly = availability.weeklySchedule[WEEKDAY_KEYS[date.getDay()]];
+    if (!weekly?.enabled) return [];
+    const storedSlots = weekly.slots?.length ? weekly.slots : [];
+    const fromToSlot = weekly.from && weekly.to ? [{ from: weekly.from, to: weekly.to }] : [];
+    return dedupeSlots(storedSlots.length ? storedSlots : fromToSlot);
+  };
+  const getDateRule = (key: string): DateAvailabilityRule => {
+    if (hasDateOverride(key)) return dateAvailability[key];
+    return { unavailable: false, slots: getWeeklySlots(key) };
+  };
+
+  const selectedRule = getDateRule(selectedDate);
+  const selectedSlots = selectedRule.unavailable ? [] : dedupeSlots(selectedRule.slots || []);
+  const selectedWeekdayIndex = parseDateKey(selectedDate).getDay();
+  const selectedWeekdayKey = WEEKDAY_KEYS[selectedWeekdayIndex];
+  const selectedWeekdayLabel = WEEKDAY_LABELS[selectedWeekdayIndex];
+  const selectedWeeklySchedule = availability.weeklySchedule[selectedWeekdayKey];
+  const selectedWeeklySlots = getWeeklySlots(selectedDate);
+  const selectedHasOverride = hasDateOverride(selectedDate);
+  const selectedSourceLabel = selectedHasOverride
+    ? "Date override"
+    : selectedWeeklySlots.length
+      ? "Weekly recurring"
+      : "No weekly schedule";
+  const cells = useMemo(() => calendarCells(viewMonth), [viewMonth]);
+
+  const setDateRule = (date: string, rule: DateAvailabilityRule) => {
+    setAvailability((current) => ({
+      ...current,
+      dateAvailability: {
+        ...current.dateAvailability,
+        [date]: {
+          unavailable: rule.unavailable === true,
+          slots: rule.unavailable ? [] : dedupeSlots(rule.slots || []),
+        },
+      },
+    }));
+  };
+
+  const setWeeklySchedule = (day: string, schedule: AdvisorDaySchedule) => {
+    const slots = dedupeSlots((schedule.slots || []).map(normalizeSlot).filter((slot): slot is RequiredSlot => !!slot));
+    setAvailability((current) => ({
+      ...current,
+      weeklySchedule: {
+        ...current.weeklySchedule,
+        [day]: {
+          enabled: schedule.enabled === true,
+          from: slots[0]?.from || schedule.from || "",
+          to: slots[0]?.to || schedule.to || "",
+          slots,
+        },
+      },
+    }));
+  };
+
+  const setSelectedWeeklyEnabled = (enabled: boolean) => {
+    setWeeklySchedule(selectedWeekdayKey, {
+      ...selectedWeeklySchedule,
+      enabled,
+    });
+  };
+
+  const addWeeklySlot = () => {
+    const current = selectedWeeklySchedule || { enabled: true, from: "", to: "", slots: [] };
+    const slots = dedupeSlots([...(current.slots || []), nextSmartSlot(current.slots || [])]);
+    setWeeklySchedule(selectedWeekdayKey, {
+      ...current,
+      enabled: true,
+      slots,
+    });
+  };
+
+  const updateWeeklySlot = (index: number, patch: Partial<RequiredSlot>) => {
+    const slots = (selectedWeeklySchedule.slots || []).map((slot, i) => (i === index ? { ...slot, ...patch } : slot));
+    if (hasDuplicateSlot(slots)) {
+      toast.error("This weekly slot already exists");
+      return;
+    }
+    setWeeklySchedule(selectedWeekdayKey, {
+      ...selectedWeeklySchedule,
+      enabled: true,
+      slots,
+    });
+  };
+
+  const removeWeeklySlot = (index: number) => {
+    const slots = (selectedWeeklySchedule.slots || []).filter((_, i) => i !== index);
+    setWeeklySchedule(selectedWeekdayKey, {
+      ...selectedWeeklySchedule,
+      enabled: slots.length > 0,
+      slots,
+    });
+  };
+
+  const clearDateOverride = () => {
+    setAvailability((current) => {
+      const next = { ...current.dateAvailability };
+      delete next[selectedDate];
+      return { ...current, dateAvailability: next };
+    });
+  };
+
+  const createDateOverride = () => {
+    setDateRule(selectedDate, {
+      unavailable: false,
+      slots: selectedSlots.length ? selectedSlots : selectedWeeklySlots,
+    });
+  };
+
+  const addSlot = () => {
+    setDateRule(selectedDate, {
+      unavailable: false,
+      slots: [...selectedSlots, nextSmartSlot(selectedSlots)],
+    });
+  };
+
+  const updateSlot = (index: number, patch: Partial<RequiredSlot>) => {
+    const slots = selectedSlots.map((slot, i) => (i === index ? { ...slot, ...patch } : slot));
+    if (hasDuplicateSlot(slots)) {
+      toast.error("This date slot already exists");
+      return;
+    }
+    setDateRule(selectedDate, { unavailable: false, slots });
+  };
+
+  const removeSlot = (index: number) => {
+    setDateRule(selectedDate, {
+      unavailable: false,
+      slots: selectedSlots.filter((_, i) => i !== index),
+    });
+  };
+
+  const markUnavailable = (unavailable: boolean) => {
+    setDateRule(selectedDate, {
+      unavailable,
+      slots: unavailable ? [] : selectedSlots,
+    });
+  };
+
+  const copyToWeek = () => {
+    const selected = parseDateKey(selectedDate);
+    const start = new Date(selected);
+    start.setDate(selected.getDate() - selected.getDay());
+    setAvailability((current) => {
+      const next = { ...current.dateAvailability };
+      for (let i = 0; i < 7; i += 1) {
+        const date = new Date(start);
+        date.setDate(start.getDate() + i);
+        next[dateKey(date)] = { unavailable: false, slots: dedupeSlots(selectedSlots) };
+      }
+      return { ...current, dateAvailability: next };
+    });
+    toast.success("Copied selected slots to this week");
+  };
+
+  const applyToAnotherDate = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(applyDate)) {
+      toast.error("Choose a valid date");
+      return;
+    }
+    setDateRule(applyDate, { unavailable: false, slots: dedupeSlots(selectedSlots) });
+    setApplyModalOpen(false);
+    toast.success("Date override created");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/admin/advisors/${advisorId}`, {
+        isOnline: availability.isOnline,
+        autoOnlineMode: availability.autoOnlineMode,
+        weeklySchedule: availability.weeklySchedule,
+        dateAvailability: availability.dateAvailability,
+      });
+      toast.success("Advisor availability updated");
+      onSaved();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not save availability");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-3">
+          <StatusPill active={availability.isOnline} label={availability.isOnline ? "Online" : "Offline"} />
+          <StatusPill active={!!metrics?.availability.availableNow} icon={<Clock size={15} />} label={metrics?.availability.availableNow ? "Available Now" : "Not Available Now"} />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={availability.isOnline}
+              onChange={(event) => setAvailability((current) => ({ ...current, isOnline: event.target.checked }))}
+              className="h-4 w-4 accent-[#0a7a90]"
+            />
+            Online
+          </label>
+          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={availability.autoOnlineMode}
+              onChange={(event) => setAvailability((current) => ({ ...current, autoOnlineMode: event.target.checked }))}
+              className="h-4 w-4 accent-[#0a7a90]"
+            />
+            Auto schedule
+          </label>
+          <Button type="button" onClick={() => markUnavailable(true)}>
+            <Plus size={15} />
+            Add Time Off
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconButton label="Previous month" onClick={() => setViewMonth(addMonths(viewMonth, -1))}>
+                <ChevronLeft size={16} />
+              </IconButton>
+              <div className="inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-slate-800">
+                <CalendarDays size={16} className="text-[#0a7a90]" />
+                {viewMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </div>
+              <IconButton label="Next month" onClick={() => setViewMonth(addMonths(viewMonth, 1))}>
+                <ChevronRight size={16} />
+              </IconButton>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setViewMonth(monthStart(now));
+                setSelectedDate(dateKey(now));
+              }}
+              className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Today
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 text-center text-[11px] font-bold text-slate-500">
+            {CALENDAR_DAYS.map((day) => (
+              <div key={day} className="py-3">{day}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {cells.map((cell) => {
+              const key = dateKey(cell);
+              const rule = getDateRule(key);
+              const overridden = hasDateOverride(key);
+              const count = rule.unavailable ? 0 : rule.slots?.length || 0;
+              const unavailable = rule.unavailable === true;
+              const inMonth = cell.getMonth() === viewMonth.getMonth();
+              const selected = key === selectedDate;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedDate(key)}
+                  className={`min-h-28 border-b border-r border-slate-100 p-2 text-left transition ${
+                    selected
+                      ? "bg-[#e6f2f6] ring-2 ring-inset ring-[#0a7a90]"
+                      : unavailable
+                        ? "bg-red-50/60"
+                        : count
+                          ? "bg-emerald-50/60 hover:bg-emerald-50"
+                          : "bg-white hover:bg-slate-50"
+                  } ${inMonth ? "" : "opacity-45"}`}
+                >
+                  <span className="text-sm font-semibold text-slate-700">{cell.getDate()}</span>
+                  <div className="mt-3 min-h-8 space-y-1">
+                    {unavailable ? <StatusLine tone="red" label="Unavailable" /> : count ? <StatusLine tone="green" label={`${count} Slot${count === 1 ? "" : "s"}`} /> : null}
+                    {overridden ? (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        Override
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-5 px-4 py-3 text-xs font-semibold text-slate-500">
+            <Legend color="bg-emerald-400" label="Available" />
+            <Legend color="bg-amber-400" label="Override" />
+            <Legend color="bg-red-300" label="Unavailable" />
+          </div>
+        </section>
+
+        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">{formatDateLabel(selectedDate)}</h2>
+              <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
+                selectedHasOverride
+                  ? "bg-amber-50 text-amber-700"
+                  : selectedWeeklySlots.length
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-600"
+              }`}>
+                {selectedSourceLabel}
+              </div>
+            </div>
+            <button type="button" className="text-slate-400 hover:text-slate-600" aria-label="Close details">
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between">
+            <div>
+              <span className="text-sm font-bold text-slate-900">Availability</span>
+              <p className="mt-0.5 text-xs text-slate-500">
+                {selectedHasOverride ? "Edits apply only to this date." : "This date follows weekly schedule until overridden."}
+              </p>
+            </div>
+            <ToggleSwitch checked={!selectedRule.unavailable} onChange={(next) => markUnavailable(!next)} />
+          </div>
+
+          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Weekly recurring slots</div>
+            <div className="mt-2 space-y-1">
+              {selectedWeeklySlots.length ? selectedWeeklySlots.map((slot, index) => (
+                <div key={`${selectedDate}-weekly-${index}`} className="text-sm font-semibold text-slate-700">
+                  {slot.from} - {slot.to}
+                </div>
+              )) : <div className="text-sm text-slate-500">No weekly schedule for this weekday.</div>}
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">{selectedHasOverride ? "This date override" : "Visible slots"}</h3>
+              {selectedHasOverride ? (
+                <button type="button" onClick={clearDateOverride} className="text-xs font-bold text-[#0a7a90] hover:underline">Use weekly schedule</button>
+              ) : (
+                <button type="button" onClick={createDateOverride} className="text-xs font-bold text-[#0a7a90] hover:underline">Override this date</button>
+              )}
+            </div>
+            {selectedRule.unavailable ? (
+              <div className="rounded-lg bg-slate-100 px-3 py-4 text-sm font-semibold text-slate-500">This day is marked unavailable.</div>
+            ) : selectedSlots.length ? (
+              selectedSlots.map((slot, index) => (
+                <TimeSlotRow
+                  key={`${selectedDate}-${index}`}
+                  slot={slot}
+                  onChange={(patch) => updateSlot(index, patch)}
+                  onRemove={() => removeSlot(index)}
+                />
+              ))
+            ) : (
+              <div className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500">No visible slots on this date.</div>
+            )}
+            <button type="button" onClick={addSlot} disabled={selectedRule.unavailable} className="inline-flex h-9 items-center gap-2 text-sm font-bold text-[#0a7a90] disabled:text-slate-400">
+              <Plus size={15} />
+              Add Time Slot
+            </button>
+          </div>
+
+          <div className="mt-6 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-bold text-slate-900">Quick Actions</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <ActionButton icon={<CalendarDays size={15} />} label="Apply to Another Date" onClick={() => { setApplyDate(selectedDate); setApplyModalOpen(true); }} />
+              <ActionButton icon={<Copy size={15} />} label="Copy to Week" onClick={copyToWeek} />
+              <ActionButton icon={<Clock size={15} />} label="Set Recurring" onClick={addWeeklySlot} />
+              <ActionButton icon={<X size={15} />} label="Mark as Unavailable" danger onClick={() => markUnavailable(true)} />
+            </div>
+          </div>
+
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Weekly recurring schedule</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Changes here repeat every {selectedWeekdayLabel}.</p>
+              </div>
+              <ToggleSwitch checked={!!selectedWeeklySchedule?.enabled} onChange={setSelectedWeeklyEnabled} />
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {!selectedWeeklySchedule?.enabled ? (
+                <div className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500">No recurring slots for {selectedWeekdayLabel}.</div>
+              ) : selectedWeeklySchedule.slots?.length ? (
+                selectedWeeklySchedule.slots.map((slot, index) => (
+                  <TimeSlotRow
+                    key={`${selectedWeekdayKey}-${index}`}
+                    slot={slot}
+                    onChange={(patch) => updateWeeklySlot(index, patch)}
+                    onRemove={() => removeWeeklySlot(index)}
+                  />
+                ))
+              ) : (
+                <div className="rounded-lg bg-slate-50 px-3 py-4 text-sm text-slate-500">Turned on, but no slots added yet.</div>
+              )}
+
+              <button type="button" onClick={addWeeklySlot} className="inline-flex h-9 items-center gap-2 text-sm font-bold text-[#0a7a90]">
+                <Plus size={15} />
+                Add Weekly Slot
+              </button>
+            </div>
+          </div>
+
+          <Button onClick={save} loading={saving} className="mt-5 w-full">Save Changes</Button>
+        </aside>
+      </div>
+
+      {applyModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Apply to another date</h2>
+                <p className="mt-1 text-sm text-slate-500">This creates a date override using the selected slots.</p>
+              </div>
+              <button type="button" onClick={() => setApplyModalOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close apply date modal">
+                <X size={18} />
+              </button>
+            </div>
+            <label className="mt-5 block">
+              <span className="mb-1.5 block text-sm font-semibold text-slate-700">Target date</span>
+              <input
+                type="date"
+                value={applyDate}
+                onChange={(event) => setApplyDate(event.target.value)}
+                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-[#0a7a90] focus:ring-2 focus:ring-[#0a7a90]/20"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setApplyModalOpen(false)}>Cancel</Button>
+              <Button type="button" onClick={applyToAnotherDate} disabled={selectedSlots.length === 0}>Apply Override</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -469,6 +923,251 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
       <div className="mt-1 font-bold text-slate-900">{value}</div>
     </div>
   );
+}
+
+function normalizeAvailabilityProfile(profile?: AdvisorProfile | null): AvailabilityProfile {
+  return {
+    isOnline: !!profile?.isOnline,
+    autoOnlineMode: !!profile?.autoOnlineMode,
+    weeklySchedule: Object.fromEntries(
+      WEEKDAY_KEYS.map((day) => [day, normalizeDaySchedule(profile?.weeklySchedule?.[day])]),
+    ) as AvailabilityProfile["weeklySchedule"],
+    dateAvailability: normalizeDateAvailability(profile?.dateAvailability),
+  };
+}
+
+function normalizeSlot(slot?: Partial<AdvisorScheduleSlot> | null): RequiredSlot | null {
+  const from = String(slot?.from || "").trim();
+  const to = String(slot?.to || "").trim();
+  if (!from || !to) return null;
+  return { from, to };
+}
+
+function normalizeDaySchedule(schedule?: Partial<AdvisorDaySchedule>): AvailabilityDaySchedule {
+  const cleanSlots = (Array.isArray(schedule?.slots) ? schedule.slots : [])
+    .map(normalizeSlot)
+    .filter((slot): slot is RequiredSlot => !!slot);
+  const uniqueSlots = dedupeSlots(cleanSlots);
+  const fallbackSlot = normalizeSlot({ from: schedule?.from, to: schedule?.to });
+  const slots = uniqueSlots.length ? uniqueSlots : fallbackSlot ? [fallbackSlot] : [];
+  return {
+    enabled: schedule?.enabled === true,
+    from: slots[0]?.from || String(schedule?.from || "09:00"),
+    to: slots[0]?.to || String(schedule?.to || "18:00"),
+    slots,
+  };
+}
+
+function normalizeDateAvailability(value?: Record<string, AdvisorDateAvailability>) {
+  const normalized: Record<string, DateAvailabilityRule> = {};
+  for (const [date, schedule] of Object.entries(value || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const slots = (schedule.slots || [])
+      .map(normalizeSlot)
+      .filter((slot): slot is RequiredSlot => !!slot);
+    normalized[date] = {
+      unavailable: schedule.unavailable === true,
+      slots: schedule.unavailable === true ? [] : dedupeSlots(slots),
+    };
+  }
+  return normalized;
+}
+
+function slotKey(slot: RequiredSlot) {
+  return `${slot.from}-${slot.to}`;
+}
+
+function dedupeSlots(slots: RequiredSlot[]) {
+  const seen = new Set<string>();
+  const unique: RequiredSlot[] = [];
+  for (const slot of slots) {
+    const key = slotKey(slot);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(slot);
+  }
+  return unique;
+}
+
+function hasDuplicateSlot(slots: RequiredSlot[]) {
+  return dedupeSlots(slots).length !== slots.length;
+}
+
+function toMinutes(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return 0;
+  return hour * 60 + minute;
+}
+
+function toTime(minutes: number) {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, minutes));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function nextSmartSlot(existingSlots: RequiredSlot[]) {
+  const existing = dedupeSlots(existingSlots);
+  if (!existing.length) return DEFAULT_NEW_SLOT;
+  let start = Math.max(...existing.map((slot) => toMinutes(slot.to)));
+  let end = Math.min(start + 60, 23 * 60 + 59);
+  if (end <= start) {
+    start = 8 * 60;
+    end = 9 * 60;
+  }
+  let next = { from: toTime(start), to: toTime(end) };
+  const taken = new Set(existing.map(slotKey));
+  while (taken.has(slotKey(next)) && end < 23 * 60 + 59) {
+    start += 60;
+    end = Math.min(start + 60, 23 * 60 + 59);
+    next = { from: toTime(start), to: toTime(end) };
+  }
+  return next;
+}
+
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+      aria-label={label}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 rounded-full transition ${checked ? "bg-emerald-500" : "bg-slate-300"}`}
+      aria-pressed={checked}
+    >
+      <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${checked ? "left-6" : "left-1"}`} />
+    </button>
+  );
+}
+
+function TimeSlotRow({
+  slot,
+  onChange,
+  onRemove,
+}: {
+  slot: RequiredSlot;
+  onChange: (patch: Partial<RequiredSlot>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+      <Clock size={16} className="shrink-0 text-slate-400" />
+      <TimeInput value={slot.from} onChange={(value) => onChange({ from: value })} />
+      <span className="text-xs font-semibold text-slate-400">-</span>
+      <TimeInput value={slot.to} onChange={(value) => onChange({ to: value })} />
+      <button type="button" onClick={onRemove} className="ml-auto text-slate-400 hover:text-red-600" aria-label="Remove time slot">
+        <Trash2 size={15} />
+      </button>
+    </div>
+  );
+}
+
+function TimeInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      type="time"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-7 min-w-0 flex-1 rounded-md border-0 bg-transparent p-0 text-sm font-semibold text-slate-700 outline-none"
+    />
+  );
+}
+
+function ActionButton({ icon, label, danger, onClick }: { icon: React.ReactNode; label: string; danger?: boolean; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-14 items-center gap-2 rounded-lg border px-3 py-2 text-left text-xs font-bold ${
+        danger
+          ? "border-red-100 bg-red-50 text-red-600 hover:bg-red-100"
+          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+      }`}
+    >
+      <span className={danger ? "text-red-500" : "text-[#0a7a90]"}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+function StatusPill({ active, label, icon }: { active: boolean; label: string; icon?: React.ReactNode }) {
+  return (
+    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+      {icon || <span className={`h-2.5 w-2.5 rounded-full ${active ? "bg-emerald-500" : "bg-slate-400"}`} />}
+      {label}
+    </span>
+  );
+}
+
+function StatusLine({ tone, label }: { tone: "green" | "red"; label: string }) {
+  const dot = tone === "green" ? "bg-emerald-500" : "bg-red-500";
+  const text = tone === "green" ? "text-emerald-700" : "text-red-600";
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-bold ${text}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      {label}
+    </span>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`h-2 w-2 rounded-full ${color}`} />
+      {label}
+    </span>
+  );
+}
+
+function monthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function calendarCells(month: Date) {
+  const first = monthStart(month);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function dateKey(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseDateKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateLabel(key: string) {
+  return parseDateKey(key).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function TagBlock({
