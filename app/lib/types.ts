@@ -124,6 +124,12 @@ export interface AdvisorPricing {
   videoPerMin?: number;
 }
 
+export interface AdvisorSessionTypes {
+  chat?: boolean;
+  call?: boolean;
+  video?: boolean;
+}
+
 export type AdvisorScheduleSlot = {
   from?: string;
   to?: string;
@@ -154,6 +160,7 @@ export interface AdvisorProfile {
   audioMessageUrl?: string;
   introVideoUrl?: string;
   pricing?: AdvisorPricing;
+  sessionTypes?: AdvisorSessionTypes;
   avgRating?: number;
   ratingsCount?: number;
   tier?: "silver" | "gold" | "platinum";
