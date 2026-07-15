@@ -8,6 +8,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Pagination } from "../../components/ui/Pagination";
 import { ConfirmDialog, Modal } from "../../components/ui/Modal";
 import { Input, Select } from "../../components/ui/Input";
+import { Combobox } from "../../components/ui/Combobox";
 import { TableSkeleton } from "../../components/Skeleton";
 import {
   BulkActionsBar,
@@ -15,12 +16,15 @@ import {
 } from "../../components/BulkActionsBar";
 import {
   EyeIcon,
+  EyeOffIcon,
+  EditIcon,
   SuspendIcon,
   UsersIcon,
   DollarIcon,
   CrownIcon,
 } from "../../components/Icons";
 import { api, ApiError } from "../../lib/api";
+import { useCountries } from "../../lib/countries";
 import { useToast } from "../../lib/toast";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { formatCompact, formatCurrency, formatDate } from "../../lib/format";
@@ -39,8 +43,65 @@ type ListResponse = {
   };
 };
 
+type UserForm = {
+  name: string;
+  email: string;
+  phone: string;
+  country: string;
+  state: string;
+  city: string;
+  currency: string;
+  timezone: string;
+  dateOfBirth: string;
+  status: UserListItem["status"];
+};
+
+type CreateUserForm = Omit<UserForm, "status" | "currency" | "timezone"> & {
+  password: string;
+};
+
+const emptyCreateUserForm: CreateUserForm = {
+  name: "",
+  email: "",
+  phone: "",
+  country: "",
+  state: "",
+  city: "",
+  dateOfBirth: "",
+  password: "",
+};
+
+const emptyUserForm: UserForm = {
+  name: "",
+  email: "",
+  phone: "",
+  country: "",
+  state: "",
+  city: "",
+  currency: "",
+  timezone: "UTC",
+  dateOfBirth: "",
+  status: "active",
+};
+
+function formFromUser(user: UserListItem): UserForm {
+  return {
+    name: user.name || "",
+    email: user.email || "",
+    phone: user.phone || "",
+    country: user.country || "",
+    state: user.state || "",
+    city: user.city || "",
+    currency: user.currency || "",
+    timezone: user.timezone || "UTC",
+    dateOfBirth: user.dateOfBirth ? user.dateOfBirth.slice(0, 10) : "",
+    status: user.status || "active",
+  };
+}
+
 export default function UsersListPage() {
   const toast = useToast();
+  const countries = useCountries();
   const [items, setItems] = useState<UserListItem[]>([]);
   const [meta, setMeta] = useState<{
     total: number;
@@ -61,7 +122,10 @@ export default function UsersListPage() {
   const [confirm, setConfirm] = useState<UserListItem | null>(null);
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", phone: "", password: "" });
+  const [newUser, setNewUser] = useState<CreateUserForm>(emptyCreateUserForm);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
+  const [editUser, setEditUser] = useState<UserForm>(emptyUserForm);
   const [actionLoading, setActionLoading] = useState(false);
 
   const bulk = useBulkSelection(items);
@@ -137,19 +201,73 @@ export default function UsersListPage() {
   };
 
   const createUser = async () => {
-    if (!newUser.name.trim() || !newUser.email.trim() || !newUser.password.trim()) {
-      toast.error("Name, email, and password are required");
+    if (
+      !newUser.name.trim() ||
+      !newUser.email.trim() ||
+      !newUser.phone.trim() ||
+      !newUser.country.trim() ||
+      !newUser.password.trim()
+    ) {
+      toast.error("Name, email, phone, country, and password are required");
       return;
     }
     setActionLoading(true);
     try {
-      await api.post("/admin/users", newUser);
+      await api.post("/admin/users", {
+        ...newUser,
+        name: newUser.name.trim(),
+        email: newUser.email.trim(),
+        phone: newUser.phone.trim(),
+        country: newUser.country.trim(),
+        city: newUser.city.trim(),
+        state: newUser.state.trim(),
+        dateOfBirth: newUser.dateOfBirth.trim(),
+        password: newUser.password,
+      });
       toast.success("User created");
       setAddOpen(false);
-      setNewUser({ name: "", email: "", phone: "", password: "" });
+      setNewUser(emptyCreateUserForm);
+      setShowNewUserPassword(false);
       load();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to create user";
+      toast.error(msg);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openEdit = (user: UserListItem) => {
+    setEditingUser(user);
+    setEditUser(formFromUser(user));
+  };
+
+  const updateUser = async () => {
+    if (!editingUser) return;
+    if (!editUser.name.trim() || !editUser.email.trim()) {
+      toast.error("Name and email are required");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await api.patch(`/admin/users/${editingUser._id}`, {
+        ...editUser,
+        name: editUser.name.trim(),
+        email: editUser.email.trim(),
+        phone: editUser.phone.trim(),
+        country: editUser.country.trim(),
+        state: editUser.state.trim(),
+        city: editUser.city.trim(),
+        currency: editUser.currency.trim(),
+        timezone: editUser.timezone.trim() || "UTC",
+        dateOfBirth: editUser.dateOfBirth.trim(),
+      });
+      toast.success("User updated");
+      setEditingUser(null);
+      setEditUser(emptyUserForm);
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update user";
       toast.error(msg);
     } finally {
       setActionLoading(false);
@@ -207,7 +325,7 @@ export default function UsersListPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder="Search name, email, phone..."
             value={q}
@@ -215,6 +333,7 @@ export default function UsersListPage() {
               setQ(e.target.value);
               setPage(1);
             }}
+            className="sm:w-80 lg:w-96"
           />
           <Select
             value={statusFilter}
@@ -222,6 +341,7 @@ export default function UsersListPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
+            className="sm:w-56"
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>
@@ -327,6 +447,14 @@ export default function UsersListPage() {
                               </Link>
                               <button
                                 type="button"
+                                onClick={() => openEdit(u)}
+                                aria-label={`Edit ${u.name}`}
+                                className="h-9 w-9 rounded-full border border-sky-200 text-[#0a7a90] inline-flex items-center justify-center hover:bg-sky-50"
+                              >
+                                <EditIcon size={16} />
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setConfirm(u)}
                                 aria-label="Suspend"
                                 className="h-9 w-9 rounded-full border border-red-200 text-red-500 inline-flex items-center justify-center hover:bg-red-50"
@@ -387,34 +515,106 @@ export default function UsersListPage() {
           loading={actionLoading}
         />
 
-        <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add New User" size="md">
-          <div className="grid grid-cols-1 gap-4">
+        <Modal
+          open={addOpen}
+          onClose={() => {
+            setAddOpen(false);
+            setNewUser(emptyCreateUserForm);
+            setShowNewUserPassword(false);
+          }}
+          title="Add New User"
+          size="lg"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Name *"
+              label="Full Name *"
+              placeholder="Enter your full name"
               value={newUser.name}
               onChange={(e) => setNewUser((u) => ({ ...u, name: e.target.value }))}
             />
             <Input
-              label="Email *"
+              label="Email Address *"
               type="email"
+              placeholder="Enter your email"
               value={newUser.email}
               onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
             />
             <Input
-              label="Phone"
+              label="Phone Number *"
+              type="tel"
+              placeholder="+1 (000) 000-0000"
               value={newUser.phone}
               onChange={(e) => setNewUser((u) => ({ ...u, phone: e.target.value }))}
             />
             <Input
-              label="Temporary Password *"
-              type="password"
-              value={newUser.password}
-              onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
+              label="Date of Birth"
+              type="date"
+              value={newUser.dateOfBirth}
+              onChange={(e) => setNewUser((u) => ({ ...u, dateOfBirth: e.target.value }))}
             />
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <label className="block">
+              <span className="block mb-1.5 text-sm font-medium text-slate-700">
+                Country *
+              </span>
+              <Combobox
+                options={countries.map((c) => ({ value: c.iso2, label: c.name }))}
+                value={newUser.country}
+                onChange={(value) => setNewUser((u) => ({ ...u, country: value }))}
+                placeholder="Select Country"
+                searchPlaceholder="Search countries..."
+                emptyText="No country found."
+                maxResults={300}
+                triggerClassName="h-11 px-3 bg-[#e6f2f6]/60 border-transparent hover:border-slate-300 focus:border-[#0a7a90] focus:bg-white focus:outline-none"
+              />
+            </label>
+            <Input
+              label="City"
+              placeholder="Enter your city"
+              value={newUser.city}
+              onChange={(e) => setNewUser((u) => ({ ...u, city: e.target.value }))}
+            />
+            <Input
+              label="State"
+              placeholder="Enter your state / province"
+              value={newUser.state}
+              onChange={(e) => setNewUser((u) => ({ ...u, state: e.target.value }))}
+            />
+            <div className="sm:col-span-2">
+              <label className="block">
+                <span className="block mb-1.5 text-sm font-medium text-slate-700">
+                  Password *
+                </span>
+                <div className="relative">
+                  <input
+                    type={showNewUserPassword ? "text" : "password"}
+                    placeholder="Create a strong password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
+                    className="w-full h-11 rounded-lg border border-transparent bg-[#e6f2f6]/60 px-4 pr-12 text-slate-900 placeholder:text-slate-500 transition-colors focus:border-[#0a7a90] focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword((show) => !show)}
+                    aria-label={showNewUserPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-3 inline-flex items-center text-slate-500 hover:text-[#0a7a90]"
+                  >
+                    {showNewUserPassword ? (
+                      <EyeOffIcon size={18} />
+                    ) : (
+                      <EyeIcon size={18} />
+                    )}
+                  </button>
+                </div>
+              </label>
+            </div>
+            <div className="sm:col-span-2 grid grid-cols-2 gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setAddOpen(false)}
+                onClick={() => {
+                  setAddOpen(false);
+                  setNewUser(emptyCreateUserForm);
+                  setShowNewUserPassword(false);
+                }}
                 className="h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
               >
                 Cancel
@@ -426,6 +626,104 @@ export default function UsersListPage() {
                 className="h-10 rounded-lg bg-[#0a7a90] text-sm font-semibold text-white hover:bg-[#076377] disabled:opacity-60"
               >
                 {actionLoading ? "Creating..." : "Add User"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        <Modal
+          open={!!editingUser}
+          onClose={() => {
+            setEditingUser(null);
+            setEditUser(emptyUserForm);
+          }}
+          title="Edit User"
+          size="lg"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Name *"
+              value={editUser.name}
+              onChange={(e) => setEditUser((u) => ({ ...u, name: e.target.value }))}
+            />
+            <Input
+              label="Email *"
+              type="email"
+              value={editUser.email}
+              onChange={(e) => setEditUser((u) => ({ ...u, email: e.target.value }))}
+            />
+            <Input
+              label="Phone"
+              value={editUser.phone}
+              onChange={(e) => setEditUser((u) => ({ ...u, phone: e.target.value }))}
+            />
+            <Select
+              label="Status"
+              value={editUser.status}
+              onChange={(e) =>
+                setEditUser((u) => ({
+                  ...u,
+                  status: e.target.value as UserForm["status"],
+                }))
+              }
+            >
+              <option value="active">Active</option>
+              <option value="pending_verification">Pending Verification</option>
+              <option value="suspended">Suspended</option>
+              <option value="deactivated">Deactivated</option>
+            </Select>
+            <Input
+              label="Country"
+              placeholder="US"
+              value={editUser.country}
+              onChange={(e) => setEditUser((u) => ({ ...u, country: e.target.value }))}
+            />
+            <Input
+              label="State"
+              value={editUser.state}
+              onChange={(e) => setEditUser((u) => ({ ...u, state: e.target.value }))}
+            />
+            <Input
+              label="City"
+              value={editUser.city}
+              onChange={(e) => setEditUser((u) => ({ ...u, city: e.target.value }))}
+            />
+            <Input
+              label="Currency"
+              placeholder="USD"
+              value={editUser.currency}
+              onChange={(e) => setEditUser((u) => ({ ...u, currency: e.target.value }))}
+            />
+            <Input
+              label="Timezone"
+              value={editUser.timezone}
+              onChange={(e) => setEditUser((u) => ({ ...u, timezone: e.target.value }))}
+            />
+            <Input
+              label="Date of Birth"
+              type="date"
+              value={editUser.dateOfBirth}
+              onChange={(e) => setEditUser((u) => ({ ...u, dateOfBirth: e.target.value }))}
+            />
+            <div className="sm:col-span-2 grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingUser(null);
+                  setEditUser(emptyUserForm);
+                }}
+                disabled={actionLoading}
+                className="h-10 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={updateUser}
+                disabled={actionLoading}
+                className="h-10 rounded-lg bg-[#0a7a90] text-sm font-semibold text-white hover:bg-[#076377] disabled:opacity-60"
+              >
+                {actionLoading ? "Updating..." : "Update User"}
               </button>
             </div>
           </div>

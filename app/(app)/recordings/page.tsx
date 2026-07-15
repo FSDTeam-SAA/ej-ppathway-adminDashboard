@@ -341,7 +341,7 @@ export default function RecordingsPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder="Search session, client, or advisor..."
             value={q}
@@ -349,6 +349,7 @@ export default function RecordingsPage() {
               setQ(e.target.value);
               setPage(1);
             }}
+            className="sm:w-80 lg:w-96"
           />
           <Select
             value={type}
@@ -356,6 +357,7 @@ export default function RecordingsPage() {
               setType(e.target.value as TabValue);
               setPage(1);
             }}
+            className="sm:w-52"
           >
             {TYPE_FILTERS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>

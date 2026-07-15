@@ -108,7 +108,7 @@ export default function AdvisorApprovalsPage() {
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder="Search applicant, email, or expertise..."
             value={q}
@@ -116,6 +116,7 @@ export default function AdvisorApprovalsPage() {
               setQ(e.target.value);
               setPage(1);
             }}
+            className="sm:w-80 lg:w-96"
           />
           <Select
             value={tab}
@@ -123,6 +124,7 @@ export default function AdvisorApprovalsPage() {
               setTab(e.target.value);
               setPage(1);
             }}
+            className="sm:w-56"
           >
             {TABS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>

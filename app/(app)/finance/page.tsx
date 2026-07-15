@@ -231,18 +231,19 @@ export default function FinancePage() {
           <Tabs tabs={TABS} active={tab} onChange={setTab} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder="Search transaction, user, advisor, or description..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            className="sm:w-80 lg:w-96"
           />
-          <Select value={tab} onChange={(e) => setTab(e.target.value)}>
+          <Select value={tab} onChange={(e) => setTab(e.target.value)} className="sm:w-52">
             {TABS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
           </Select>
-          <Select value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
+          <Select value={period} onChange={(e) => setPeriod(e.target.value as Period)} className="sm:w-44">
             {PERIODS.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}

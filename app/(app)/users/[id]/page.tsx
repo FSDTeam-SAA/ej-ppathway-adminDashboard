@@ -11,6 +11,7 @@ import { Badge } from "../../../components/ui/Badge";
 import { Modal, ConfirmDialog } from "../../../components/ui/Modal";
 import { Button } from "../../../components/ui/Button";
 import { Input } from "../../../components/ui/Input";
+import { Pagination } from "../../../components/ui/Pagination";
 import { DetailSkeleton } from "../../../components/Skeleton";
 import { formatCurrency, formatDate } from "../../../lib/format";
 import { useCountryName } from "../../../lib/countries";
@@ -36,6 +37,8 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
   const [resetLoading, setResetLoading] = useState(false);
   const [confirmSuspend, setConfirmSuspend] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [sessionPage, setSessionPage] = useState(1);
+  const [sessionLimit, setSessionLimit] = useState(10);
 
   const load = async () => {
     setLoading(true);
@@ -113,6 +116,15 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  const sessions = data?.recentSessions || [];
+  const sessionTotal = sessions.length;
+  const sessionTotalPages = Math.max(1, Math.ceil(sessionTotal / sessionLimit));
+  const normalizedSessionPage = Math.min(sessionPage, sessionTotalPages);
+  const pagedSessions = sessions.slice(
+    (normalizedSessionPage - 1) * sessionLimit,
+    normalizedSessionPage * sessionLimit,
+  );
+
   return (
     <>
       <Topbar />
@@ -161,6 +173,10 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                 <Field label="Name" value={data.user.name} />
                 <Field label="Email" value={data.user.email} />
                 <Field label="Phone" value={data.user.phone || "—"} />
+                <Field
+                  label="Date of Birth"
+                  value={data.user.dateOfBirth ? formatDate(data.user.dateOfBirth) : "—"}
+                />
                 <Field label="Country" value={countryName(data.user.country) || "—"} />
                 <Field label="State" value={data.user.state || "—"} />
                 <Field label="City" value={data.user.city || "—"} />
@@ -250,17 +266,47 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
               </p>
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                 {(data.recentTransactions || []).length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {(data.recentTransactions || []).slice(0, 8).map((t) => (
-                      <div key={t._id} className="grid grid-cols-1 md:grid-cols-4 gap-2 px-4 py-3 text-sm">
-                        <span className="font-medium text-slate-900">{t.txCode || t._id.slice(-6).toUpperCase()}</span>
-                        <span className="capitalize text-slate-600">{t.type.replace(/_/g, " ")}</span>
-                        <span className={t.type.includes("refund") ? "text-red-600 font-medium" : "text-emerald-600 font-medium"}>
-                          {formatCurrency(t.amount)}
-                        </span>
-                        <span className="text-slate-500 md:text-right">{formatDate(t.createdAt, true)}</span>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                        <tr className="border-b border-slate-100">
+                          <th className="px-4 py-3 font-semibold">Transaction ID</th>
+                          <th className="px-4 py-3 font-semibold">Type</th>
+                          <th className="px-4 py-3 font-semibold">Credit / Amount</th>
+                          <th className="px-4 py-3 font-semibold">Status</th>
+                          <th className="px-4 py-3 font-semibold text-right">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(data.recentTransactions || []).slice(0, 8).map((t) => (
+                          <tr key={t._id} className="hover:bg-slate-50/70">
+                            <td className="px-4 py-3 font-medium text-slate-900">
+                              {t.txCode || t._id.slice(-6).toUpperCase()}
+                            </td>
+                            <td className="px-4 py-3 capitalize text-slate-600">
+                              {t.type.replace(/_/g, " ")}
+                            </td>
+                            <td
+                              className={`px-4 py-3 font-semibold ${
+                                t.type.includes("refund")
+                                  ? "text-red-600"
+                                  : "text-emerald-600"
+                              }`}
+                            >
+                              {formatTransactionAmount(t)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize text-slate-700">
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right text-slate-500">
+                              {formatDate(t.createdAt, true)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <p className="px-4 py-6 text-sm text-slate-500">No transaction history</p>
@@ -291,9 +337,9 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
             </section>
 
             <h3 className="text-lg font-semibold text-slate-900 mb-3">Session History</h3>
-            {data.recentSessions && data.recentSessions.length > 0 ? (
+            {sessionTotal > 0 ? (
               <div className="space-y-2">
-                {data.recentSessions.map((s) => (
+                {pagedSessions.map((s) => (
                   <div
                     key={s._id}
                     className="flex items-center justify-between p-4 rounded-xl border border-slate-100"
@@ -313,6 +359,16 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                     <div className="text-sm text-slate-500">{formatDate(s.createdAt)}</div>
                   </div>
                 ))}
+                <Pagination
+                  page={normalizedSessionPage}
+                  limit={sessionLimit}
+                  total={sessionTotal}
+                  onPage={setSessionPage}
+                  onLimit={(nextLimit) => {
+                    setSessionLimit(nextLimit);
+                    setSessionPage(1);
+                  }}
+                />
               </div>
             ) : (
               <p className="text-slate-500">No session history</p>
@@ -428,6 +484,29 @@ function subscriptionPlanName(sub: NonNullable<UserDetailsResponse["subscription
   if (sub.planName) return sub.planName;
   if (typeof sub.plan === "string") return sub.plan;
   return sub.plan?.name || "Plan";
+}
+
+const CREDIT_TRANSACTION_TYPES = new Set([
+  "session_charge",
+  "session_refund",
+  "tip",
+  "unlock_recording",
+  "unlock_transcript",
+  "credit_expiration",
+  "free_credit_grant",
+  "advisor_earning",
+  "advisor_tip",
+  "advisor_payout",
+  "platform_commission",
+]);
+
+function formatTransactionAmount(
+  transaction: NonNullable<UserDetailsResponse["recentTransactions"]>[number],
+) {
+  if (CREDIT_TRANSACTION_TYPES.has(transaction.type)) {
+    return formatCredits(transaction.amount);
+  }
+  return formatCurrency(transaction.amount);
 }
 
 function sessionIcon(type?: string) {

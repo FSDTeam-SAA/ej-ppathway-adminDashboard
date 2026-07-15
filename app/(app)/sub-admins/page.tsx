@@ -109,7 +109,7 @@ export default function SubAdminsPage() {
         />
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder="Search name, email, phone…"
             value={search}
@@ -117,6 +117,7 @@ export default function SubAdminsPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
+            className="sm:w-80 lg:w-96"
           />
           <Select
             value={roleFilter}
@@ -124,6 +125,7 @@ export default function SubAdminsPage() {
               setRoleFilter(e.target.value);
               setPage(1);
             }}
+            className="sm:w-56"
           >
             <option value="">All Roles</option>
             {(catalog?.roles || []).map((r) => (
@@ -138,6 +140,7 @@ export default function SubAdminsPage() {
               setStatusFilter(e.target.value);
               setPage(1);
             }}
+            className="sm:w-48"
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>

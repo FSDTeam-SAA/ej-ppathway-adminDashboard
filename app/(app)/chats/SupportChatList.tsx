@@ -164,13 +164,14 @@ export function SupportChatList({
           ]}
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white/50 p-3 shadow-sm sm:flex-row sm:items-center sm:flex-wrap">
           <Input
             placeholder={`Search ${title.toLowerCase()} by name...`}
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            className="sm:w-80 lg:w-96"
           />
-          <Select value={role || ""} disabled>
+          <Select value={role || ""} disabled className="sm:w-52">
             <option value="">All Support</option>
             <option value="advisor">Advisor Support</option>
             <option value="user">User Support</option>

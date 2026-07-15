@@ -258,14 +258,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                     </span>
                   }
                 />
-                <Field
-                  label="Price Per Min"
-                  value={
-                    <span className="text-slate-700">
-                      {pricing?.chatPerMin ?? 0} chat credits/min | {pricing?.callPerMin ?? 0} call credits/min | {pricing?.videoPerMin ?? 0} video credits/min
-                    </span>
-                  }
-                />
                 <Field label="Date Joined" value={formatDate(u.createdAt)} />
                 <Field label="Last Login" value={u.lastLoginAt ? formatRelative(u.lastLoginAt) : "N/A"} />
                 <Field
@@ -287,16 +279,35 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                 </p>
               </div>
 
-              {p?.introVideoUrl && (
+              {(p?.audioMessageUrl || p?.introVideoUrl) && (
                 <div className="mt-6">
                   <div className="text-sm font-medium text-slate-500 mb-2">Intro Media</div>
-                  {isAudioMediaUrl(p.introVideoUrl) ? (
-                    <div className="w-full max-w-xl rounded-xl bg-slate-100 p-4">
-                      <audio src={p.introVideoUrl} controls className="w-full" />
-                    </div>
-                  ) : (
-                    <video src={p.introVideoUrl} controls className="w-full max-w-xl rounded-xl" />
-                  )}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {p?.audioMessageUrl && (
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <div className="mb-3 text-sm font-semibold text-slate-700">
+                          Audio Message
+                        </div>
+                        <audio src={p.audioMessageUrl} controls className="w-full" />
+                      </div>
+                    )}
+                    {p?.introVideoUrl && (
+                      <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                        <div className="mb-3 text-sm font-semibold text-slate-700">
+                          Intro Video
+                        </div>
+                        {isAudioMediaUrl(p.introVideoUrl) ? (
+                          <audio src={p.introVideoUrl} controls className="w-full" />
+                        ) : (
+                          <video
+                            src={p.introVideoUrl}
+                            controls
+                            className="w-full rounded-xl bg-black"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </Section>
@@ -325,6 +336,15 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                 <Stat label="Refunds" value={formatCurrency(m?.finance.refundAmount)} />
                 <Stat label="Chargebacks" value={formatCurrency(m?.finance.chargebackAmount)} />
               </div>
+            </Section>
+
+            {/* ===== Admin Pricing ===== */}
+            <Section title="Pricing">
+              <AdminPricingSection
+                advisorId={id}
+                pricing={pricing}
+                onSaved={load}
+              />
             </Section>
 
             {/* ===== Availability ===== */}
@@ -419,6 +439,97 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+function AdminPricingSection({
+  advisorId,
+  pricing,
+  onSaved,
+}: {
+  advisorId: string;
+  pricing?: AdvisorProfile["pricing"];
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    chatPerMin: pricing?.chatPerMin?.toString() || "0",
+    callPerMin: pricing?.callPerMin?.toString() || "0",
+    videoPerMin: pricing?.videoPerMin?.toString() || "0",
+  });
+
+  useEffect(() => {
+    setForm({
+      chatPerMin: pricing?.chatPerMin?.toString() || "0",
+      callPerMin: pricing?.callPerMin?.toString() || "0",
+      videoPerMin: pricing?.videoPerMin?.toString() || "0",
+    });
+  }, [pricing?.chatPerMin, pricing?.callPerMin, pricing?.videoPerMin]);
+
+  const setRate = (key: keyof typeof form, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const savePricing = async () => {
+    const values = Object.values(form).map((value) => Number(value));
+    if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+      toast.error("Pricing must be zero or a positive number");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.patch(`/admin/advisors/${advisorId}`, {
+        pricing: {
+          chatPerMin: form.chatPerMin,
+          callPerMin: form.callPerMin,
+          videoPerMin: form.videoPerMin,
+        },
+      });
+      toast.success("Pricing updated");
+      onSaved();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to update pricing";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          label="Chat credits/min"
+          type="number"
+          min="0"
+          step="0.01"
+          value={form.chatPerMin}
+          onChange={(e) => setRate("chatPerMin", e.target.value)}
+        />
+        <Input
+          label="Audio call credits/min"
+          type="number"
+          min="0"
+          step="0.01"
+          value={form.callPerMin}
+          onChange={(e) => setRate("callPerMin", e.target.value)}
+        />
+        <Input
+          label="Video call credits/min"
+          type="number"
+          min="0"
+          step="0.01"
+          value={form.videoPerMin}
+          onChange={(e) => setRate("videoPerMin", e.target.value)}
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={savePricing} loading={saving}>
+          Save Pricing
+        </Button>
+      </div>
     </div>
   );
 }
