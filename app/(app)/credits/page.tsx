@@ -37,6 +37,8 @@ type CreditSettings = {
   creditPacks: CreditPack[];
   creditUsage: {
     chatTranscript: number;
+    videoRecording: number;
+    audioRecording: number;
     sessionRecording: number;
   };
   creditUsageBlocks: CreditUsageBlock[];
@@ -76,8 +78,9 @@ const DEFAULT_USAGE_BLOCKS: CreditUsageBlock[] = [
   { id: "video_5", activity: "5-Minute Video Call", sessionType: "video", durationMinutes: 5, credits: 10, isActive: true, sortOrder: 5 },
   { id: "video_10", activity: "10-Minute Video Call", sessionType: "video", durationMinutes: 10, credits: 15, isActive: true, sortOrder: 6 },
   { id: "video_15", activity: "15-Minute Video Call", sessionType: "video", durationMinutes: 15, credits: 20, isActive: true, sortOrder: 7 },
-  { id: "session_recording", activity: "Session Recording", sessionType: "add_on", durationMinutes: 0, credits: 5, isActive: true, sortOrder: 8 },
-  { id: "chat_transcript", activity: "Chat Transcript", sessionType: "add_on", durationMinutes: 0, credits: 5, isActive: true, sortOrder: 9 },
+  { id: "video_recording", activity: "Video Recording Unlock", sessionType: "add_on", durationMinutes: 0, credits: 5, isActive: true, sortOrder: 8 },
+  { id: "audio_recording", activity: "Audio Recording Unlock", sessionType: "add_on", durationMinutes: 0, credits: 5, isActive: true, sortOrder: 9 },
+  { id: "chat_transcript", activity: "Chat PDF Transcript Unlock", sessionType: "add_on", durationMinutes: 0, credits: 5, isActive: true, sortOrder: 10 },
 ];
 
 export default function CreditManagementPage() {
@@ -185,6 +188,36 @@ export default function CreditManagementPage() {
             </section>
 
             <section className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-slate-900">Recording & Transcript Unlock Credits</h2>
+                <p className="text-sm text-slate-500">Set how many credits users spend to unlock session video, session audio, and chat PDF transcripts.</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="Video recording unlock credits"
+                  type="number"
+                  min={0}
+                  value={String(settings.creditUsage.videoRecording)}
+                  onChange={(e) => setUnlockCredit(settings, setSettings, "videoRecording", Number(e.target.value))}
+                />
+                <Input
+                  label="Audio recording unlock credits"
+                  type="number"
+                  min={0}
+                  value={String(settings.creditUsage.audioRecording)}
+                  onChange={(e) => setUnlockCredit(settings, setSettings, "audioRecording", Number(e.target.value))}
+                />
+                <Input
+                  label="Chat PDF transcript unlock credits"
+                  type="number"
+                  min={0}
+                  value={String(settings.creditUsage.chatTranscript)}
+                  onChange={(e) => setUnlockCredit(settings, setSettings, "chatTranscript", Number(e.target.value))}
+                />
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Credit Packs</h2>
@@ -277,6 +310,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
+  const usageBlocks = mergeUsageBlocks(data?.creditUsageBlocks);
   return {
     signupFreeCredits: Number(data?.signupFreeCredits ?? 0),
     creditExpirationDays: Number(data?.creditExpirationDays ?? 60),
@@ -293,9 +327,11 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
     })),
     creditUsage: {
       chatTranscript: Number(data?.creditUsage?.chatTranscript ?? 5),
+      videoRecording: Number(data?.creditUsage?.videoRecording ?? data?.creditUsage?.sessionRecording ?? 5),
+      audioRecording: Number(data?.creditUsage?.audioRecording ?? data?.creditUsage?.sessionRecording ?? 5),
       sessionRecording: Number(data?.creditUsage?.sessionRecording ?? 5),
     },
-    creditUsageBlocks: (data?.creditUsageBlocks?.length ? data.creditUsageBlocks : DEFAULT_USAGE_BLOCKS).map((block, index) => ({
+    creditUsageBlocks: usageBlocks.map((block, index) => ({
       id: block.id || `usage_${index + 1}`,
       activity: block.activity || "Credit usage",
       sessionType: block.sessionType || "add_on",
@@ -307,12 +343,47 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
   };
 }
 
+function mergeUsageBlocks(blocks?: CreditUsageBlock[]) {
+  const source = blocks?.length ? blocks : DEFAULT_USAGE_BLOCKS;
+  const merged = source.filter((block) => block.id !== "session_recording");
+  for (const defaultBlock of DEFAULT_USAGE_BLOCKS) {
+    if (!merged.some((block) => block.id === defaultBlock.id)) merged.push(defaultBlock);
+  }
+  return merged;
+}
+
 function patchPack(settings: CreditSettings, setSettings: (next: CreditSettings) => void, index: number, patch: Partial<CreditPack>) {
   setSettings({ ...settings, creditPacks: settings.creditPacks.map((pack, i) => i === index ? { ...pack, ...patch } : pack) });
 }
 
 function patchBlock(settings: CreditSettings, setSettings: (next: CreditSettings) => void, index: number, patch: Partial<CreditUsageBlock>) {
   setSettings({ ...settings, creditUsageBlocks: settings.creditUsageBlocks.map((block, i) => i === index ? { ...block, ...patch } : block) });
+}
+
+function setUnlockCredit(
+  settings: CreditSettings,
+  setSettings: (next: CreditSettings) => void,
+  key: "videoRecording" | "audioRecording" | "chatTranscript",
+  credits: number,
+) {
+  const blockIdByKey = {
+    videoRecording: "video_recording",
+    audioRecording: "audio_recording",
+    chatTranscript: "chat_transcript",
+  };
+  const nextVideo = key === "videoRecording" ? credits : settings.creditUsage.videoRecording;
+  const nextAudio = key === "audioRecording" ? credits : settings.creditUsage.audioRecording;
+  setSettings({
+    ...settings,
+    creditUsage: {
+      ...settings.creditUsage,
+      [key]: credits,
+      sessionRecording: Math.max(nextVideo, nextAudio),
+    },
+    creditUsageBlocks: settings.creditUsageBlocks.map((block) =>
+      block.id === blockIdByKey[key] ? { ...block, credits } : block,
+    ),
+  });
 }
 
 function newPack(index: number): CreditPack {
@@ -333,6 +404,13 @@ function validate(settings: CreditSettings) {
     }
   }
   if (!settings.creditUsageBlocks.length) return "Add at least one usage block";
+  if (
+    settings.creditUsage.videoRecording < 0 ||
+    settings.creditUsage.audioRecording < 0 ||
+    settings.creditUsage.chatTranscript < 0
+  ) {
+    return "Recording and transcript unlock credits must be non-negative";
+  }
   for (const block of settings.creditUsageBlocks) {
     if (!block.id.trim() || !block.activity.trim() || block.durationMinutes < 0 || block.credits < 0) {
       return "Each usage block needs ID, activity, non-negative minutes, and non-negative credits";

@@ -14,7 +14,7 @@ import { Input, Select, Textarea } from "../../components/ui/Input";
 import { EyeIcon, ShieldIcon, PdfIcon, UploadIcon } from "../../components/Icons";
 import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, API_BASE, getAccessToken } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate } from "../../lib/format";
 import type {
@@ -27,9 +27,12 @@ import { MiniArea } from "../../components/charts";
 
 const COMPLAINT_TABS = [
   { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
+  { value: "pending", label: "New" },
+  { value: "reviewing", label: "Under Review" },
+  { value: "pending_information", label: "Pending Information" },
+  { value: "escalated", label: "Escalated" },
   { value: "reject", label: "Rejected" },
-  { value: "complete", label: "Complete" },
+  { value: "complete", label: "Resolved" },
 ];
 
 type ListMeta = {
@@ -46,6 +49,10 @@ type ListMeta = {
     flaggedAdvisors: number;
   };
 };
+
+type ComplianceSession = NonNullable<Complaint["session"] | Dispute["session"]>;
+type EvidenceTab = "video" | "audio" | "chat";
+type ComplaintActionStatus = "complete" | "reject" | "reviewing" | "pending_information" | "escalated";
 
 export default function CompliancePage() {
   const [section, setSection] = useState<"complaints" | "disputes">("complaints");
@@ -131,6 +138,7 @@ export default function CompliancePage() {
             </>
           ) : null}
         </div>
+        <ComplianceSummary period={period} from={from} to={to} />
         {section === "complaints" ? (
           <ComplaintsSection q={q} period={period} from={from} to={to} />
         ) : (
@@ -141,13 +149,7 @@ export default function CompliancePage() {
   );
 }
 
-function ComplaintsSection({ q, period, from, to }: { q: string; period: string; from: string; to: string }) {
-  const toast = useToast();
-  const [tab, setTab] = useState("all");
-  const [items, setItems] = useState<Complaint[]>([]);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
-  const [total, setTotal] = useState(0);
+function ComplianceSummary({ period, from, to }: { period: string; from: string; to: string }) {
   const [totals, setTotals] = useState({
     all: 0,
     open: 0,
@@ -159,6 +161,63 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
     flaggedUsers: 0,
     flaggedAdvisors: 0,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<Complaint[]>("/admin/complaints", {
+        page: 1,
+        limit: 1,
+        period: period === "custom" ? undefined : period,
+        from: period === "custom" ? from || undefined : undefined,
+        to: period === "custom" ? to || undefined : undefined,
+      })
+      .then((res) => {
+        const m = (res.meta || {}) as ListMeta;
+        if (!cancelled && m.totals) setTotals(m.totals);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTotals({
+            all: 0,
+            open: 0,
+            solved: 0,
+            rejected: 0,
+            totalDisputes: 0,
+            openDisputes: 0,
+            resolvedDisputes: 0,
+            flaggedUsers: 0,
+            flaggedAdvisors: 0,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [period, from, to]);
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+      <SummaryCard label="Total Complaints" value={totals.all} color="#86efac" icon={<ShieldIcon />} />
+      <SummaryCard label="Open Complaints" value={totals.open} color="#fbbf24" icon={<ShieldIcon />} />
+      <SummaryCard label="Resolved Complaints" value={totals.solved} color="#60a5fa" icon={<ShieldIcon />} />
+      <SummaryCard label="Rejected Complaints" value={totals.rejected} color="#f87171" icon={<ShieldIcon />} />
+      <SummaryCard label="Total Disputes" value={totals.totalDisputes} color="#38bdf8" icon={<ShieldIcon />} />
+      <SummaryCard label="Open Disputes" value={totals.openDisputes} color="#f59e0b" icon={<ShieldIcon />} />
+      <SummaryCard label="Resolved Disputes" value={totals.resolvedDisputes} color="#22c55e" icon={<ShieldIcon />} />
+      <SummaryCard label="Flagged Users" value={totals.flaggedUsers} color="#fb7185" icon={<ShieldIcon />} />
+      <SummaryCard label="Flagged Advisors" value={totals.flaggedAdvisors} color="#a78bfa" icon={<ShieldIcon />} />
+    </div>
+  );
+}
+
+function ComplaintsSection({ q, period, from, to }: { q: string; period: string; from: string; to: string }) {
+  const toast = useToast();
+  const [tab, setTab] = useState("all");
+  const [items, setItems] = useState<Complaint[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<Complaint | null>(null);
   const [resolveOpen, setResolveOpen] = useState(false);
@@ -183,7 +242,6 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
       setItems(r.data || []);
       const m = (r.meta || {}) as ListMeta;
       setTotal(m.total || 0);
-      if (m.totals) setTotals(m.totals);
       bulk.clear();
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
@@ -211,7 +269,7 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
     load();
   };
 
-  const bulkUpdateStatus = async (status: "complete" | "reject" | "reviewing") => {
+  const bulkUpdateStatus = async (status: ComplaintActionStatus) => {
     if (bulk.selectedCount === 0) return;
     setActionLoading(true);
     const results = await Promise.allSettled(
@@ -248,7 +306,7 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page, limit, q, period, from, to]);
 
-  const updateStatus = async (status: "complete" | "reject" | "reviewing") => {
+  const updateStatus = async (status: ComplaintActionStatus) => {
     if (!details) return;
     setActionLoading(true);
     try {
@@ -268,18 +326,6 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
 
   return (
     <div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-          <SummaryCard label="Total Complaints" value={totals.all} color="#86efac" icon={<ShieldIcon />} />
-          <SummaryCard label="Open Complaints" value={totals.open} color="#fbbf24" icon={<ShieldIcon />} />
-          <SummaryCard label="Resolved Complaints" value={totals.solved} color="#60a5fa" icon={<ShieldIcon />} />
-          <SummaryCard label="Rejected Complaints" value={totals.rejected} color="#f87171" icon={<ShieldIcon />} />
-          <SummaryCard label="Total Disputes" value={totals.totalDisputes} color="#38bdf8" icon={<ShieldIcon />} />
-          <SummaryCard label="Open Disputes" value={totals.openDisputes} color="#f59e0b" icon={<ShieldIcon />} />
-          <SummaryCard label="Resolved Disputes" value={totals.resolvedDisputes} color="#22c55e" icon={<ShieldIcon />} />
-          <SummaryCard label="Flagged Users" value={totals.flaggedUsers} color="#fb7185" icon={<ShieldIcon />} />
-          <SummaryCard label="Flagged Advisors" value={totals.flaggedAdvisors} color="#a78bfa" icon={<ShieldIcon />} />
-        </div>
-
         <div className="mb-6">
           <Tabs tabs={COMPLAINT_TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
@@ -295,6 +341,7 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
             <Button size="sm" variant="danger" loading={actionLoading} onClick={() => bulkUpdateStatus("reject")}>Bulk Reject</Button>
             <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => bulkUpdateStatus("reviewing")}>Bulk Assign</Button>
             <Button size="sm" variant="outline" loading={actionLoading} onClick={() => bulkUpdateStatus("complete")}>Bulk Close</Button>
+            <Button size="sm" variant="outline" loading={actionLoading} onClick={() => bulkUpdateStatus("escalated")}>Bulk Escalate</Button>
             <Button size="sm" variant="outline" onClick={exportSelected}>Bulk Export</Button>
           </div>
         ) : null}
@@ -440,32 +487,7 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
               </div>
               <Field label="Description" value={details.description || "—"} />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                <a
-                  href={details.session?.recordingUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`rounded-lg border px-3 py-3 text-sm font-medium ${
-                    details.session?.recordingUrl
-                      ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
-                      : "pointer-events-none border-slate-100 text-slate-400"
-                  }`}
-                >
-                  Session Recording
-                </a>
-                <a
-                  href={details.session?.transcriptUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`rounded-lg border px-3 py-3 text-sm font-medium ${
-                    details.session?.transcriptUrl
-                      ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
-                      : "pointer-events-none border-slate-100 text-slate-400"
-                  }`}
-                >
-                  Session Transcript
-                </a>
-              </div>
+              <SessionEvidencePanel session={details.session} />
 
               {details.documents && details.documents.length > 0 && (
                 <div className="mt-3">
@@ -503,6 +525,18 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
                 <div className="grid grid-cols-2 gap-3 mt-5">
                   <Button variant="outline" onClick={() => setDetails(null)}>
                     Not Now
+                  </Button>
+                  <Button variant="secondary" loading={actionLoading} onClick={() => updateStatus("reviewing")}>
+                    Assign / Under Review
+                  </Button>
+                  <Button variant="outline" loading={actionLoading} onClick={() => updateStatus("pending_information")}>
+                    Pending Information
+                  </Button>
+                  <Button variant="outline" loading={actionLoading} onClick={() => updateStatus("escalated")}>
+                    Escalate Case
+                  </Button>
+                  <Button variant="danger" loading={actionLoading} onClick={() => updateStatus("reject")}>
+                    Reject
                   </Button>
                   <Button onClick={() => setResolveOpen(true)}>Resolve</Button>
                 </div>
@@ -747,21 +781,8 @@ function DisputesSection({ q, period, from, to }: { q: string; period: string; f
     downloadCsv("disputes-export.csv", [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n"));
   };
 
-  const totals = {
-    all: items.length,
-    open: items.filter((d) => d.status === "open").length,
-    investigating: items.filter((d) => d.status === "investigating").length,
-    resolved: items.filter((d) => d.status === "resolved").length,
-  };
-
   return (
     <div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <SummaryCard label="Total disputes" value={total} color="#86efac" icon={<ShieldIcon />} />
-        <SummaryCard label="Investigating" value={totals.investigating} color="#fbbf24" icon={<ShieldIcon />} />
-        <SummaryCard label="Resolved" value={totals.resolved} color="#60a5fa" icon={<ShieldIcon />} />
-      </div>
-
       <div className="mb-6">
         <Tabs
           tabs={DISPUTE_TABS.map((t) => ({ value: t.value, label: t.label }))}
@@ -931,32 +952,7 @@ function DisputesSection({ q, period, from, to }: { q: string; period: string; f
               <Field label="Amount Disputed" value={formatCurrency(details.session?.chargedAmount)} />
               <Field label="Assigned Admin" value={details.resolvedBy?.name || "-"} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-              <a
-                href={details.session?.recordingUrl || "#"}
-                target="_blank"
-                rel="noreferrer"
-                className={`rounded-lg border px-3 py-3 text-sm font-medium ${
-                  details.session?.recordingUrl
-                    ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
-                    : "pointer-events-none border-slate-100 text-slate-400"
-                }`}
-              >
-                Session Recording
-              </a>
-              <a
-                href={details.session?.transcriptUrl || "#"}
-                target="_blank"
-                rel="noreferrer"
-                className={`rounded-lg border px-3 py-3 text-sm font-medium ${
-                  details.session?.transcriptUrl
-                    ? "border-sky-200 text-[#0a7a90] hover:bg-sky-50"
-                    : "pointer-events-none border-slate-100 text-slate-400"
-                }`}
-              >
-                Session Transcript
-              </a>
-            </div>
+            <SessionEvidencePanel session={details.session} />
             <Field
               label="Expected resolution"
               value={(details.expectedResolution || "—").replace(/_/g, " ")}
@@ -1244,6 +1240,152 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+function SessionEvidencePanel({ session }: { session?: ComplianceSession }) {
+  const [active, setActive] = useState<EvidenceTab>(() => {
+    if (session?.type === "video") return "video";
+    if (session?.type === "call") return "audio";
+    return "chat";
+  });
+  const [objectUrl, setObjectUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const hasVideo = session?.type === "video" && !!session.recordingUrl;
+  const hasAudio = session?.type === "call" && !!session.recordingUrl;
+  const hasChat = session?.type === "chat" || !!session?.transcriptUrl;
+
+  useEffect(() => {
+    if (session?.type === "video") setActive("video");
+    else if (session?.type === "call") setActive("audio");
+    else setActive("chat");
+  }, [session?._id, session?.type]);
+
+  useEffect(() => {
+    if (!session?._id) {
+      setObjectUrl("");
+      setError("");
+      setLoading(false);
+      return;
+    }
+
+    const canLoad =
+      (active === "video" && hasVideo) ||
+      (active === "audio" && hasAudio) ||
+      (active === "chat" && hasChat);
+
+    if (!canLoad) {
+      setObjectUrl("");
+      setError("");
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let nextUrl = "";
+    const token = getAccessToken();
+    const path =
+      active === "chat"
+        ? `/admin/sessions/${session._id}/transcript/download`
+        : `/sessions/${session._id}/recording/download`;
+
+    setObjectUrl("");
+    setError("");
+    setLoading(true);
+
+    fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          let message = `Evidence request failed (${res.status})`;
+          try {
+            const body = (await res.json()) as { message?: string };
+            message = body.message || message;
+          } catch {
+            // keep default message
+          }
+          throw new Error(message);
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        nextUrl = URL.createObjectURL(blob);
+        if (!cancelled) setObjectUrl(nextUrl);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load evidence");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (nextUrl) URL.revokeObjectURL(nextUrl);
+    };
+  }, [active, hasAudio, hasChat, hasVideo, session?._id]);
+
+  const tabs: Array<{ value: EvidenceTab; label: string; enabled: boolean }> = [
+    { value: "video", label: "Video", enabled: hasVideo },
+    { value: "audio", label: "Audio", enabled: hasAudio },
+    { value: "chat", label: "Chat PDF", enabled: hasChat },
+  ];
+  const activeLabel = tabs.find((tab) => tab.value === active)?.label || "Evidence";
+
+  return (
+    <div className="mt-3 rounded-xl border border-slate-100 p-3">
+      <div className="grid grid-cols-3 gap-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => setActive(tab.value)}
+            className={`h-11 rounded-lg border px-3 text-left text-sm font-medium ${
+              active === tab.value
+                ? "border-sky-300 bg-sky-50 text-[#0a7a90]"
+                : tab.enabled
+                  ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  : "border-slate-100 text-slate-400"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 min-h-44 rounded-lg bg-slate-50 p-3">
+        {loading ? (
+          <div className="flex min-h-40 items-center justify-center text-sm text-slate-500">
+            Loading {activeLabel.toLowerCase()}...
+          </div>
+        ) : error ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : objectUrl && active === "video" ? (
+          <video src={objectUrl} controls className="max-h-80 w-full rounded-lg bg-black" />
+        ) : objectUrl && active === "audio" ? (
+          <audio src={objectUrl} controls className="w-full" />
+        ) : objectUrl && active === "chat" ? (
+          <iframe src={objectUrl} title="Chat PDF transcript" className="h-80 w-full rounded-lg border border-slate-200 bg-white" />
+        ) : (
+          <div className="flex min-h-40 items-center justify-center text-center text-sm text-slate-500">
+            {session?._id ? `${activeLabel} is not available for this session.` : "No session evidence is attached."}
+          </div>
+        )}
+
+        {objectUrl ? (
+          <div className="mt-3 text-right">
+            <a href={objectUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-[#0a7a90] hover:underline">
+              Open {activeLabel}
+            </a>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function labelize(value?: string) {
   if (!value) return "-";
   return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -1272,16 +1414,20 @@ function priorityLevel(complaint: Complaint) {
 function complaintStatusLabel(status?: string) {
   if (status === "pending") return "New";
   if (status === "reviewing") return "Under Review";
+  if (status === "pending_information") return "Pending Information";
   if (status === "complete") return "Resolved";
   if (status === "reject" || status === "rejected") return "Rejected";
+  if (status === "escalated") return "Escalated";
   return labelize(status);
 }
 
 function ComplaintStatusBadge({ status }: { status?: string }) {
   if (status === "pending") return <Badge tone="warning">New</Badge>;
   if (status === "reviewing") return <Badge tone="info">Under Review</Badge>;
+  if (status === "pending_information") return <Badge tone="warning">Pending Information</Badge>;
   if (status === "complete") return <Badge tone="success">Resolved</Badge>;
   if (status === "reject" || status === "rejected") return <Badge tone="danger">Rejected</Badge>;
+  if (status === "escalated") return <Badge tone="danger">Escalated</Badge>;
   return <Badge>{status || "-"}</Badge>;
 }
 

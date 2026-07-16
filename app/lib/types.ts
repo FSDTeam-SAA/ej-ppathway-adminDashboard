@@ -351,7 +351,14 @@ export interface Complaint {
   issueType: string;
   description?: string;
   documents?: string[];
-  status: "pending" | "reviewing" | "complete" | "reject" | "rejected";
+  status:
+    | "pending"
+    | "reviewing"
+    | "pending_information"
+    | "complete"
+    | "reject"
+    | "rejected"
+    | "escalated";
   resolutionNote?: string;
   resolvedBy?: AdminUser;
   createdAt: string;
