@@ -12,7 +12,7 @@ import { Input, Select } from "../../components/ui/Input";
 import { Spinner } from "../../components/Spinner";
 import { CallIcon, VideoIcon, PlayIcon } from "../../components/Icons";
 import { MessageSquare } from "lucide-react";
-import { api, ApiError } from "../../lib/api";
+import { api, ApiError, API_BASE, getAccessToken } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { formatDate, formatDuration } from "../../lib/format";
 import type { SessionItem, TranscriptResponse } from "../../lib/types";
@@ -279,7 +279,42 @@ export default function RecordingsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState<SessionItem | null>(null);
+  const [playbackUrl, setPlaybackUrl] = useState("");
+  const [playbackLoading, setPlaybackLoading] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
   const [transcriptFor, setTranscriptFor] = useState<SessionItem | null>(null);
+
+  const fetchRecordingBlob = useCallback(async (sessionId: string) => {
+    const token = getAccessToken();
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/recording/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let message = `Recording request failed (${res.status})`;
+      try {
+        const body = (await res.json()) as { message?: string };
+        message = body.message || message;
+      } catch {
+        // keep default message
+      }
+      throw new ApiError(message, res.status, null);
+    }
+    return res.blob();
+  }, []);
+
+  const downloadRecording = useCallback(async (session: SessionItem) => {
+    try {
+      const blob = await fetchRecordingBlob(session._id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `session-recording-${session.sessionCode || session._id}.mp4`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to download recording");
+    }
+  }, [fetchRecordingBlob, toast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -301,6 +336,40 @@ export default function RecordingsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!playing?.recordingUrl) {
+      setPlaybackUrl("");
+      setPlaybackError("");
+      setPlaybackLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl = "";
+    setPlaybackUrl("");
+    setPlaybackError("");
+    setPlaybackLoading(true);
+
+    fetchRecordingBlob(playing._id)
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setPlaybackUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setPlaybackError(err instanceof ApiError ? err.message : "Failed to load recording");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPlaybackLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fetchRecordingBlob, playing]);
 
   return (
     <>
@@ -450,15 +519,20 @@ export default function RecordingsPage() {
                                   <PlayIcon size={15} /> Play
                                 </button>
                                 {s.recordingUrl ? (
-                                  <a
-                                    href={s.recordingUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    download
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadRecording(s)}
                                     className="inline-flex items-center h-9 px-3 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50"
                                   >
                                     Download
-                                  </a>
+                                  </button>
+                                ) : s.recordingStatus === "failed" ? (
+                                  <span
+                                    title={s.recordingError || "Recording failed"}
+                                    className="inline-flex items-center h-9 px-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-sm"
+                                  >
+                                    Failed
+                                  </span>
                                 ) : (
                                   <span className="inline-flex items-center h-9 px-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-sm">
                                     Processing
@@ -497,27 +571,39 @@ export default function RecordingsPage() {
       >
         {playing?.recordingUrl ? (
           <div className="space-y-3">
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              src={playing.recordingUrl}
-              controls
-              autoPlay
-              className="w-full rounded-lg bg-black max-h-[70vh]"
-            />
+            {playbackLoading ? (
+              <div className="flex min-h-48 items-center justify-center rounded-lg bg-slate-950 text-sm text-white">
+                Loading recording...
+              </div>
+            ) : playbackError ? (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                {playbackError}
+              </div>
+            ) : playbackUrl ? (
+              /* eslint-disable-next-line jsx-a11y/media-has-caption */
+              <video
+                src={playbackUrl}
+                controls
+                autoPlay
+                className="w-full rounded-lg bg-black max-h-[70vh]"
+              />
+            ) : null}
             <div className="flex items-center justify-between text-sm text-slate-500">
               <span>
                 {playing.advisor?.name || "Advisor"} &amp;{" "}
                 {playing.user?.name || "Client"} •{" "}
                 {formatDuration(playing.actualDurationSec)}
               </span>
-              <a
-                href={playing.recordingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[#0a7a90] hover:underline"
-              >
-                Open in new tab
-              </a>
+              {playbackUrl ? (
+                <a
+                  href={playbackUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#0a7a90] hover:underline"
+                >
+                  Open in new tab
+                </a>
+              ) : null}
             </div>
           </div>
         ) : (

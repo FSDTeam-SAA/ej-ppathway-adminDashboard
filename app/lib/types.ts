@@ -306,6 +306,8 @@ export interface SessionItem {
   internalNotes?: string;
   createdAt: string;
   recordingUrl?: string;
+  recordingStatus?: "pending" | "starting" | "recording" | "completed" | "failed";
+  recordingError?: string;
   transcriptUrl?: string;
   hasTranscript?: boolean;
   messageCount?: number;
