@@ -671,7 +671,16 @@ export interface PayoutTransferMethod {
 }
 
 export interface PayoutAccountDetails {
-  advisor: { _id: string; name: string; email?: string; profilePhoto?: string; country?: string };
+  advisor: {
+    _id: string;
+    name: string;
+    email?: string;
+    profilePhoto?: string;
+    country?: string;
+    state?: string;
+    city?: string;
+    dateOfBirth?: string;
+  };
   account: PayoutAccountInfo;
   transferMethods: PayoutTransferMethod[];
   balance: {
