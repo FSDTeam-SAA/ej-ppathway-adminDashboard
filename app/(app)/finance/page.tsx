@@ -21,7 +21,6 @@ import { useToast } from "../../lib/toast";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { AreaChart, DonutChart, MiniArea } from "../../components/charts";
 import type {
-  Commissions,
   FinanceOverview,
   Transaction,
   AdvisorEarning,
@@ -33,7 +32,6 @@ const TABS = [
   { value: "payouts", label: "Payouts" },
   { value: "refunds", label: "Refunds & Disputes" },
   { value: "subscriptions", label: "Credit Purchases" },
-  { value: "commissions", label: "Commissions" },
 ];
 
 const PERIODS = [
@@ -261,7 +259,6 @@ export default function FinancePage() {
         {tab === "payouts" && <PayoutsTab q={q} />}
         {tab === "refunds" && <RefundsTab q={q} />}
         {tab === "subscriptions" && <SubscriptionRevenueTab q={q} />}
-        {tab === "commissions" && <CommissionsTab />}
       </main>
     </>
   );
@@ -523,7 +520,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
       </div>
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
-          <TableSkeleton rows={6} cols={6} />
+          <TableSkeleton rows={6} cols={5} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -683,15 +680,14 @@ function AdvisorEarningsTab() {
                   <th className="px-5 py-4 font-medium">Advisor</th>
                   <th className="px-5 py-4 font-medium">Tier</th>
                   <th className="px-5 py-4 font-medium">Sessions</th>
-                  <th className="px-5 py-4 font-medium">Gross Earnings</th>
-                  <th className="px-5 py-4 font-medium">Platform Commission</th>
+                  <th className="px-5 py-4 font-medium">Total Earned</th>
                   <th className="px-5 py-4 font-medium text-right">Paid Out</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-500">
+                    <td colSpan={5} className="text-center py-10 text-slate-500">
                       No advisor earnings yet
                     </td>
                   </tr>
@@ -711,7 +707,6 @@ function AdvisorEarningsTab() {
                       </td>
                       <td className="px-5 py-3 text-slate-700">{e.totalSessions}</td>
                       <td className="px-5 py-3 font-medium text-emerald-600">{formatCurrency(e.grossEarnings)}</td>
-                      <td className="px-5 py-3 text-slate-700">{formatCurrency(e.platformCommission)}</td>
                       <td className="px-5 py-3 text-right text-slate-700">{formatCurrency(e.paidEarnings)}</td>
                     </tr>
                   ))
@@ -921,15 +916,16 @@ function PayoutsTab({ q }: { q: string }) {
   );
 }
 
-function CommissionsTab() {
+function RemovedFinanceSettingsTab() {
+  type LegacyRateSettings = { silver: number; gold: number; platinum: number };
   const toast = useToast();
-  const [comm, setComm] = useState<Commissions>({ silver: 20, gold: 15, platinum: 10 });
+  const [comm, setComm] = useState<LegacyRateSettings>({ silver: 20, gold: 15, platinum: 10 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api
-      .get<Commissions>("/admin/finance/commissions")
+      .get<LegacyRateSettings>("/admin/finance/legacy-rates")
       .then((r) => {
         if (r.data) setComm((current) => ({ ...current, ...r.data }));
       })
@@ -940,8 +936,8 @@ function CommissionsTab() {
   const save = async () => {
     setSaving(true);
     try {
-      await api.patch("/admin/finance/commissions", comm);
-      toast.success("Commissions updated");
+      await api.patch("/admin/finance/legacy-rates", comm);
+      toast.success("Settings updated");
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed";
       toast.error(msg);
@@ -952,9 +948,9 @@ function CommissionsTab() {
 
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <h2 className="text-2xl font-bold text-slate-900 mb-1">Commission Management</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-1">Removed Settings</h2>
       <p className="text-sm text-slate-500 mb-5">
-        Set the platform commission percentage taken from each advisor tier.
+        This settings panel is no longer available.
       </p>
       {loading ? (
         <div className="space-y-4 max-w-3xl">
@@ -973,7 +969,7 @@ function CommissionsTab() {
           <Slider label={<Badge tone="platinum">Platinum</Badge>} value={comm.platinum} onChange={(v) => setComm({ ...comm, platinum: v })} />
 
           <Button onClick={save} loading={saving}>
-            Save Commissions
+            Save Settings
           </Button>
         </div>
       )}
@@ -994,7 +990,7 @@ function Slider({
     <div>
       <div className="flex items-center justify-between mb-2">
         <div>{label}</div>
-        <span className="text-slate-700 font-medium">{value}% commission · {100 - value}% advisor</span>
+        <span className="text-slate-700 font-medium">{value}% legacy value</span>
       </div>
       <input
         type="range"

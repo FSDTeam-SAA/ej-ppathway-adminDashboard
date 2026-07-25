@@ -175,7 +175,7 @@ export default function DashboardPage() {
             {/* Revenue (50%) + Advisor Approvals (50%) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               <Card>
-                <CardHeader title="Revenue Overview" subtitle="Track total revenue, platform commission, and payouts over time." noFilter />
+                <CardHeader title="Revenue Overview" subtitle="Track total revenue and payouts over time." noFilter />
                 <AreaChart data={revenueAreaData} formatValue={(v) => `${Math.round(v / 1000)}K`} color="#0a7a90" height={260} />
               </Card>
 

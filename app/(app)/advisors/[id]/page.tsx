@@ -326,10 +326,9 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
 
             {/* ===== Financial Performance ===== */}
             <Section title="Financial Performance">
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Stat label="Total Revenue" value={formatCurrency(m?.finance.totalRevenue)} />
                 <Stat label="Advisor Earnings" value={formatCurrency(m?.finance.advisorEarnings)} />
-                <Stat label="Platform Earnings" value={formatCurrency(m?.finance.platformEarnings)} />
                 <Stat label="Pending Payouts" value={formatCurrency(m?.finance.pendingPayouts)} />
                 <Stat label="Total Paid Out" value={formatCurrency(m?.finance.totalPaidOut)} />
                 <Stat label="Refunds" value={formatCurrency(m?.finance.refundAmount)} />

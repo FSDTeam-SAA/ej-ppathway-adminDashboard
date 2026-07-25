@@ -118,6 +118,9 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
 
   const sessions = data?.recentSessions || [];
   const sessionTotal = sessions.length;
+  const displayTransactions = (data?.recentTransactions || []).filter(
+    (transaction) => transaction.type !== "platform_commission",
+  );
   const sessionTotalPages = Math.max(1, Math.ceil(sessionTotal / sessionLimit));
   const normalizedSessionPage = Math.min(sessionPage, sessionTotalPages);
   const pagedSessions = sessions.slice(
@@ -262,10 +265,10 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
             <section className="mb-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-1">Transactions & Credit Refunds</h3>
               <p className="mb-3 text-sm text-slate-500">
-                Credit purchases, session charges, advisor earnings, platform commissions, and credit refunds.
+                Credit purchases, session charges, advisor earnings, payouts, and credit refunds.
               </p>
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                {(data.recentTransactions || []).length > 0 ? (
+                {displayTransactions.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -278,7 +281,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {(data.recentTransactions || []).slice(0, 8).map((t) => (
+                        {displayTransactions.slice(0, 8).map((t) => (
                           <tr key={t._id} className="hover:bg-slate-50/70">
                             <td className="px-4 py-3 font-medium text-slate-900">
                               {t.txCode || t._id.slice(-6).toUpperCase()}
@@ -497,7 +500,6 @@ const CREDIT_TRANSACTION_TYPES = new Set([
   "advisor_earning",
   "advisor_tip",
   "advisor_payout",
-  "platform_commission",
 ]);
 
 function formatTransactionAmount(

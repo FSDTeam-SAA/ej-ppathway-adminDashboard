@@ -189,7 +189,6 @@ export interface AdvisorMetrics {
   finance: {
     totalRevenue: number;
     advisorEarnings: number;
-    platformEarnings: number;
     pendingPayouts: number;
     totalPaidOut: number;
     refundAmount: number;
@@ -594,7 +593,6 @@ export interface FinanceOverview {
   monthlyRevenue: number;
   pendingPayouts: number;
   pendingPayoutsCount: number;
-  platformCommission: number;
   platformRevenue?: PeriodAmounts;
   netRevenue?: PeriodAmounts;
   wallet?: { totalDeposits: number; totalBalance: number; totalFreeCredits: number };
@@ -618,15 +616,8 @@ export interface AdvisorEarning {
   tier: "silver" | "gold" | "platinum";
   totalSessions: number;
   grossEarnings: number;
-  platformCommission: number;
   netEarnings: number;
   paidEarnings: number;
-}
-
-export interface Commissions {
-  silver: number;
-  gold: number;
-  platinum: number;
 }
 
 /* ----- Payouts (Hyperwallet) ----- */
