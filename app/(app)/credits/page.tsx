@@ -34,6 +34,11 @@ type CreditSettings = {
   signupFreeCredits: number;
   creditExpirationDays: number;
   creditUsdRate: number;
+  advisorCreditPricing: {
+    chatPerMin: number;
+    callPerMin: number;
+    videoPerMin: number;
+  };
   creditPacks: CreditPack[];
   creditUsage: {
     chatTranscript: number;
@@ -122,7 +127,14 @@ export default function CreditManagementPage() {
     }
     setSaving(true);
     try {
-      const res = await api.patch<CreditSettings>("/admin/settings/credits", settings);
+      const res = await api.patch<CreditSettings>("/admin/settings/credits", {
+        signupFreeCredits: settings.signupFreeCredits,
+        creditExpirationDays: settings.creditExpirationDays,
+        creditUsdRate: settings.creditUsdRate,
+        advisorCreditPricing: settings.advisorCreditPricing,
+        creditPacks: settings.creditPacks,
+        creditUsageBlocks: settings.creditUsageBlocks,
+      });
       setSettings(withDefaults(res.data));
       toast.success("Credit management updated");
       await load();
@@ -189,30 +201,35 @@ export default function CreditManagementPage() {
 
             <section className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-slate-900">Recording & Transcript Unlock Credits</h2>
-                <p className="text-sm text-slate-500">Set how many credits users spend to unlock session video, session audio, and chat PDF transcripts.</p>
+                <h2 className="text-lg font-semibold text-slate-900">Advisor Session Pricing</h2>
+                <p className="text-sm text-slate-500">
+                  Set the global credits-per-minute rate used by every advisor profile on the website and mobile app.
+                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Input
-                  label="Video recording unlock credits"
+                  label="Chat credits/min"
                   type="number"
                   min={0}
-                  value={String(settings.creditUsage.videoRecording)}
-                  onChange={(e) => setUnlockCredit(settings, setSettings, "videoRecording", Number(e.target.value))}
+                  step={0.01}
+                  value={String(settings.advisorCreditPricing.chatPerMin)}
+                  onChange={(e) => setAdvisorPricing(settings, setSettings, "chatPerMin", Number(e.target.value))}
                 />
                 <Input
-                  label="Audio recording unlock credits"
+                  label="Audio call credits/min"
                   type="number"
                   min={0}
-                  value={String(settings.creditUsage.audioRecording)}
-                  onChange={(e) => setUnlockCredit(settings, setSettings, "audioRecording", Number(e.target.value))}
+                  step={0.01}
+                  value={String(settings.advisorCreditPricing.callPerMin)}
+                  onChange={(e) => setAdvisorPricing(settings, setSettings, "callPerMin", Number(e.target.value))}
                 />
                 <Input
-                  label="Chat PDF transcript unlock credits"
+                  label="Video call credits/min"
                   type="number"
                   min={0}
-                  value={String(settings.creditUsage.chatTranscript)}
-                  onChange={(e) => setUnlockCredit(settings, setSettings, "chatTranscript", Number(e.target.value))}
+                  step={0.01}
+                  value={String(settings.advisorCreditPricing.videoPerMin)}
+                  onChange={(e) => setAdvisorPricing(settings, setSettings, "videoPerMin", Number(e.target.value))}
                 />
               </div>
             </section>
@@ -315,6 +332,11 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
     signupFreeCredits: Number(data?.signupFreeCredits ?? 0),
     creditExpirationDays: Number(data?.creditExpirationDays ?? 60),
     creditUsdRate: Number(data?.creditUsdRate ?? 1),
+    advisorCreditPricing: {
+      chatPerMin: Number(data?.advisorCreditPricing?.chatPerMin ?? 1),
+      callPerMin: Number(data?.advisorCreditPricing?.callPerMin ?? 1),
+      videoPerMin: Number(data?.advisorCreditPricing?.videoPerMin ?? 2),
+    },
     creditPacks: (data?.creditPacks?.length ? data.creditPacks : DEFAULT_PACKS).map((pack, index) => ({
       id: pack.id || `credits_${index + 1}`,
       label: pack.label || `${pack.credits || 0} Credits`,
@@ -360,29 +382,18 @@ function patchBlock(settings: CreditSettings, setSettings: (next: CreditSettings
   setSettings({ ...settings, creditUsageBlocks: settings.creditUsageBlocks.map((block, i) => i === index ? { ...block, ...patch } : block) });
 }
 
-function setUnlockCredit(
+function setAdvisorPricing(
   settings: CreditSettings,
   setSettings: (next: CreditSettings) => void,
-  key: "videoRecording" | "audioRecording" | "chatTranscript",
-  credits: number,
+  key: keyof CreditSettings["advisorCreditPricing"],
+  value: number,
 ) {
-  const blockIdByKey = {
-    videoRecording: "video_recording",
-    audioRecording: "audio_recording",
-    chatTranscript: "chat_transcript",
-  };
-  const nextVideo = key === "videoRecording" ? credits : settings.creditUsage.videoRecording;
-  const nextAudio = key === "audioRecording" ? credits : settings.creditUsage.audioRecording;
   setSettings({
     ...settings,
-    creditUsage: {
-      ...settings.creditUsage,
-      [key]: credits,
-      sessionRecording: Math.max(nextVideo, nextAudio),
+    advisorCreditPricing: {
+      ...settings.advisorCreditPricing,
+      [key]: value,
     },
-    creditUsageBlocks: settings.creditUsageBlocks.map((block) =>
-      block.id === blockIdByKey[key] ? { ...block, credits } : block,
-    ),
   });
 }
 
@@ -397,6 +408,16 @@ function newUsageBlock(index: number): CreditUsageBlock {
 function validate(settings: CreditSettings) {
   if (!Number.isFinite(settings.creditUsdRate) || settings.creditUsdRate <= 0) return "Custom purchase rate must be greater than 0";
   if (!Number.isFinite(settings.creditExpirationDays) || settings.creditExpirationDays <= 0) return "Credit expiration days must be greater than 0";
+  if (
+    !Number.isFinite(settings.advisorCreditPricing.chatPerMin) ||
+    settings.advisorCreditPricing.chatPerMin < 0 ||
+    !Number.isFinite(settings.advisorCreditPricing.callPerMin) ||
+    settings.advisorCreditPricing.callPerMin < 0 ||
+    !Number.isFinite(settings.advisorCreditPricing.videoPerMin) ||
+    settings.advisorCreditPricing.videoPerMin < 0
+  ) {
+    return "Advisor session pricing must be zero or a positive number";
+  }
   if (!settings.creditPacks.length) return "Add at least one credit pack";
   for (const pack of settings.creditPacks) {
     if (!pack.id.trim() || !pack.label.trim() || pack.credits <= 0 || pack.priceUsd < 0 || (pack.bonusCredits || 0) < 0) {
@@ -404,13 +425,6 @@ function validate(settings: CreditSettings) {
     }
   }
   if (!settings.creditUsageBlocks.length) return "Add at least one usage block";
-  if (
-    settings.creditUsage.videoRecording < 0 ||
-    settings.creditUsage.audioRecording < 0 ||
-    settings.creditUsage.chatTranscript < 0
-  ) {
-    return "Recording and transcript unlock credits must be non-negative";
-  }
   for (const block of settings.creditUsageBlocks) {
     if (!block.id.trim() || !block.activity.trim() || block.durationMinutes < 0 || block.credits < 0) {
       return "Each usage block needs ID, activity, non-negative minutes, and non-negative credits";

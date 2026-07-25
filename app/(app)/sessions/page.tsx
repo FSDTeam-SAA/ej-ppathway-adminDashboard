@@ -739,7 +739,7 @@ function TranscriptPreview({
         const fromAdvisor = String(message.sender?._id) === String(advisorId);
         return (
           <div key={message._id} className={`flex ${fromAdvisor ? "justify-start" : "justify-end"}`}>
-            <div className={`max-w-[78%] rounded-2xl px-4 py-2 ${fromAdvisor ? "bg-white text-slate-800" : "bg-[#0a7a90] text-white"}`}>
+            <div className={`max-w-[85%] break-words rounded-2xl px-3 py-2 sm:max-w-[78%] sm:px-4 ${fromAdvisor ? "bg-white text-slate-800" : "bg-[#0a7a90] text-white"}`}>
               <div className="mb-1 text-[11px] opacity-70">
                 {message.sender?.name || "User"} - {formatDate(message.createdAt, true)}
               </div>

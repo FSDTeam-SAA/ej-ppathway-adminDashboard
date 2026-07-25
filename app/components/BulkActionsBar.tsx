@@ -18,7 +18,7 @@ export function BulkActionsBar({
 }: Props) {
   if (selectedCount === 0) return null;
   return (
-    <div className={`flex items-center justify-between mb-3 ${className}`}>
+    <div className={`flex flex-col items-start gap-3 mb-3 sm:flex-row sm:items-center sm:justify-between ${className}`}>
       <div className="text-sm text-slate-700">
         <span className="font-semibold">{selectedCount} Selected</span>
         <span className="mx-2 text-slate-300">·</span>

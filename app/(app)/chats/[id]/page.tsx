@@ -176,7 +176,7 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
                         key={m._id}
                         className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                       >
-                        <div className={`flex items-end gap-2 max-w-[70%] ${isMe ? "flex-row-reverse" : ""}`}>
+                        <div className={`flex items-end gap-2 max-w-[85%] break-words sm:max-w-[70%] ${isMe ? "flex-row-reverse" : ""}`}>
                           {!isMe && (
                             <Avatar
                               src={senderObj?.profilePhoto}

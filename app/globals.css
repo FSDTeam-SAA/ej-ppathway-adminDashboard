@@ -69,6 +69,7 @@
 
 html,
 body {
+  min-width: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-outfit), system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -76,6 +77,21 @@ body {
 
 button {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+main .overflow-x-auto > table {
+  min-width: 760px;
+}
+
+@media (max-width: 640px) {
+  main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
 }
 
 input,

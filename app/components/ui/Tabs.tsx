@@ -12,13 +12,13 @@ export function Tabs({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
       {tabs.map((t) => (
         <button
           key={t.value}
           type="button"
           onClick={() => onChange(t.value)}
-          className={`px-4 h-9 rounded-full text-sm font-medium transition-colors border ${
+          className={`h-9 shrink-0 rounded-full border px-4 text-sm font-medium transition-colors ${
             active === t.value
               ? "bg-[#0a7a90] text-white border-[#0a7a90]"
               : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"

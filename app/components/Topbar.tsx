@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "../lib/auth-context";
 import { Avatar } from "./ui/Avatar";
-import { SearchIcon } from "./Icons";
+import { MenuIcon, SearchIcon } from "./Icons";
 import { NotificationBell } from "./NotificationBell";
 
 export function Topbar({
@@ -17,8 +17,17 @@ export function Topbar({
   const [q, setQ] = useState("");
 
   return (
-    <div className="flex items-center justify-between gap-4 px-6 md:px-8 py-4 sticky top-0 bg-[#dff1f6]/80 backdrop-blur z-30">
-      <div className="flex-1 max-w-xl">
+    <div className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 bg-[#dff1f6]/90 px-4 py-3 backdrop-blur sm:px-6 md:px-8 md:py-4">
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event("admin-sidebar:open"))}
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 md:hidden"
+        aria-label="Open menu"
+      >
+        <MenuIcon size={22} />
+      </button>
+
+      <div className="order-3 w-full min-w-0 sm:order-none sm:flex-1 sm:max-w-xl">
         {onSearch ? (
           <form
             onSubmit={(e) => {
@@ -43,7 +52,7 @@ export function Topbar({
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <NotificationBell />
         <div className="flex items-center gap-3">
           <Avatar src={user?.profilePhoto} name={user?.name} size={40} />

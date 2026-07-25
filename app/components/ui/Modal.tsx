@@ -36,19 +36,19 @@ export function Modal({ open, onClose, title, children, size = "md", hideClose }
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[800] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[800] flex items-center justify-center p-3 sm:p-4">
       <div
         className="absolute inset-0 bg-black/50"
         onClick={onClose}
         aria-hidden
       />
       <div
-        className={`relative bg-white rounded-2xl shadow-xl w-full ${sizes[size]} max-h-[92vh] overflow-y-auto`}
+        className={`relative w-full ${sizes[size]} max-h-[92vh] overflow-y-auto rounded-xl bg-white shadow-xl sm:rounded-2xl`}
       >
         {(title || !hideClose) && (
-          <div className="flex items-start justify-between p-6 pb-2">
+          <div className="flex items-start justify-between gap-3 p-4 pb-2 sm:p-6 sm:pb-2">
             {title ? (
-              <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+              <h2 className="min-w-0 text-lg font-semibold text-slate-900 sm:text-xl">{title}</h2>
             ) : (
               <span />
             )}
@@ -64,7 +64,7 @@ export function Modal({ open, onClose, title, children, size = "md", hideClose }
             )}
           </div>
         )}
-        <div className="px-6 pb-6">{children}</div>
+        <div className="px-4 pb-4 sm:px-6 sm:pb-6">{children}</div>
       </div>
     </div>
   );
@@ -94,11 +94,11 @@ export function ConfirmDialog({
   return (
     <Modal open={open} onClose={onClose} hideClose size="sm">
       <div className="text-center py-2">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">{title}</h2>
+        <h2 className="text-xl font-bold text-slate-900 mb-2 sm:text-2xl">{title}</h2>
         {description && (
           <p className="text-slate-600 text-sm mb-6">{description}</p>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={onClose}

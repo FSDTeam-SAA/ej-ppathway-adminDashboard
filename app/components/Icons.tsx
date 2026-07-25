@@ -120,6 +120,13 @@ export const SearchIcon = (p: IconProps) => (
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </I>
 );
+export const MenuIcon = (p: IconProps) => (
+  <I {...p}>
+    <line x1="4" y1="6" x2="20" y2="6" />
+    <line x1="4" y1="12" x2="20" y2="12" />
+    <line x1="4" y1="18" x2="20" y2="18" />
+  </I>
+);
 export const BellIcon = (p: IconProps) => (
   <I {...p}>
     <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />

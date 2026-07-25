@@ -204,7 +204,6 @@ export default function AdvisorsPage() {
                     </th>
                     <th className="px-5 py-4 font-semibold">Advisor</th>
                     <th className="px-5 py-4 font-semibold">Ratings</th>
-                    <th className="px-5 py-4 font-semibold">Credit Rate</th>
                     <th className="px-5 py-4 font-semibold">Sessions</th>
                     <th className="px-5 py-4 font-semibold">Tier</th>
                     <th className="px-5 py-4 font-semibold">Status</th>
@@ -214,14 +213,13 @@ export default function AdvisorsPage() {
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="text-center py-10 text-slate-500">
+                      <td colSpan={7} className="text-center py-10 text-slate-500">
                         No advisors
                       </td>
                     </tr>
                   ) : (
                     items.map((it) => {
                       const rating = it.profile?.avgRating;
-                      const price = it.profile?.pricing?.videoPerMin || it.profile?.pricing?.callPerMin || it.profile?.pricing?.chatPerMin;
                       const sessions = it.profile?.totalSessions || 0;
                       const tier = ["silver", "gold", "platinum"].includes(it.profile?.tier ?? "") ? (it.profile!.tier as string) : "silver";
                       const selected = bulk.isSelected(it.user._id);
@@ -250,9 +248,6 @@ export default function AdvisorsPage() {
                               <StarIcon size={16} filled />
                               {rating ? rating.toFixed(1) : "0.0"}
                             </span>
-                          </td>
-                          <td className="px-5 py-3 text-slate-700">
-                            {price ? `${Number(price).toFixed(2)} credits/min` : "N/A"}
                           </td>
                           <td className="px-5 py-3 text-slate-700">{sessions}</td>
                           <td className="px-5 py-3">
@@ -450,9 +445,6 @@ function AddAdvisorModal({
     tier: "silver",
     type: "",
     style: "",
-    chatPerMin: "",
-    callPerMin: "",
-    videoPerMin: "",
     bio: "",
   });
   const countries = useCountries();
@@ -487,11 +479,6 @@ function AddAdvisorModal({
         expertise: form.type,
         styles: form.style,
         bio: form.bio,
-        pricing: {
-          chatPerMin: form.chatPerMin,
-          callPerMin: form.callPerMin,
-          videoPerMin: form.videoPerMin,
-        },
       });
       setCreated({ email: form.email, password: form.password });
       onCreated();
@@ -505,7 +492,7 @@ function AddAdvisorModal({
 
   const handleClose = () => {
     setCreated(null);
-    setForm({ name: "", email: "", phoneNumber: "", country: "", state: "", city: "", timezone: "", professionalTitle: "", language: "", password: "", experience: "", tier: "silver", type: "", style: "", chatPerMin: "", callPerMin: "", videoPerMin: "", bio: "" });
+    setForm({ name: "", email: "", phoneNumber: "", country: "", state: "", city: "", timezone: "", professionalTitle: "", language: "", password: "", experience: "", tier: "silver", type: "", style: "", bio: "" });
     onClose();
   };
 
@@ -648,33 +635,6 @@ function AddAdvisorModal({
           value={form.style}
           onChange={(v) => onChange("style", v)}
         />
-      </div>
-
-      <div className="mt-5">
-        <p className="text-sm font-semibold text-slate-700 mb-2">Credits Per Minute</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            label="Chat (credits/min)"
-            type="number"
-            value={form.chatPerMin}
-            onChange={(e) => onChange("chatPerMin", e.target.value)}
-            placeholder="e.g. 0.33"
-          />
-          <Input
-            label="Call (credits/min)"
-            type="number"
-            value={form.callPerMin}
-            onChange={(e) => onChange("callPerMin", e.target.value)}
-            placeholder="e.g. 1.00"
-          />
-          <Input
-            label="Video (credits/min)"
-            type="number"
-            value={form.videoPerMin}
-            onChange={(e) => onChange("videoPerMin", e.target.value)}
-            placeholder="e.g. 1.33"
-          />
-        </div>
       </div>
 
       <div className="mt-4">

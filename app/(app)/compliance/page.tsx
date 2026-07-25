@@ -548,7 +548,7 @@ function ComplaintsSection({ q, period, from, to }: { q: string; period: string;
                     onChange={(e) => setNote(e.target.value)}
                     placeholder="Outcome / explanation..."
                   />
-                  <div className="grid grid-cols-3 gap-3 mt-4">
+                  <div className="grid grid-cols-1 gap-3 mt-4 sm:grid-cols-3">
                     <Button
                       variant="outline"
                       onClick={() => setResolveOpen(false)}
@@ -1334,7 +1334,7 @@ function SessionEvidencePanel({ session }: { session?: ComplianceSession }) {
 
   return (
     <div className="mt-3 rounded-xl border border-slate-100 p-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
         {tabs.map((tab) => (
           <button
             key={tab.value}

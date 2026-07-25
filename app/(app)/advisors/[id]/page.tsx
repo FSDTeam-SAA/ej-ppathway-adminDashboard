@@ -152,7 +152,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
   const u = data?.user;
   const p = data?.profile;
   const m = data?.metrics;
-  const pricing = p?.pricing;
 
   return (
     <>
@@ -338,15 +337,6 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               </div>
             </Section>
 
-            {/* ===== Admin Pricing ===== */}
-            <Section title="Pricing">
-              <AdminPricingSection
-                advisorId={id}
-                pricing={pricing}
-                onSaved={load}
-              />
-            </Section>
-
             {/* ===== Availability ===== */}
             <Section title="Availability">
               <AdminAvailabilityCalendar
@@ -439,97 +429,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
       <h3 className="text-lg font-semibold text-slate-900 mb-4">{title}</h3>
       {children}
-    </div>
-  );
-}
-
-function AdminPricingSection({
-  advisorId,
-  pricing,
-  onSaved,
-}: {
-  advisorId: string;
-  pricing?: AdvisorProfile["pricing"];
-  onSaved: () => void;
-}) {
-  const toast = useToast();
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    chatPerMin: pricing?.chatPerMin?.toString() || "0",
-    callPerMin: pricing?.callPerMin?.toString() || "0",
-    videoPerMin: pricing?.videoPerMin?.toString() || "0",
-  });
-
-  useEffect(() => {
-    setForm({
-      chatPerMin: pricing?.chatPerMin?.toString() || "0",
-      callPerMin: pricing?.callPerMin?.toString() || "0",
-      videoPerMin: pricing?.videoPerMin?.toString() || "0",
-    });
-  }, [pricing?.chatPerMin, pricing?.callPerMin, pricing?.videoPerMin]);
-
-  const setRate = (key: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  const savePricing = async () => {
-    const values = Object.values(form).map((value) => Number(value));
-    if (values.some((value) => !Number.isFinite(value) || value < 0)) {
-      toast.error("Pricing must be zero or a positive number");
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.patch(`/admin/advisors/${advisorId}`, {
-        pricing: {
-          chatPerMin: form.chatPerMin,
-          callPerMin: form.callPerMin,
-          videoPerMin: form.videoPerMin,
-        },
-      });
-      toast.success("Pricing updated");
-      onSaved();
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Failed to update pricing";
-      toast.error(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Input
-          label="Chat credits/min"
-          type="number"
-          min="0"
-          step="0.01"
-          value={form.chatPerMin}
-          onChange={(e) => setRate("chatPerMin", e.target.value)}
-        />
-        <Input
-          label="Audio call credits/min"
-          type="number"
-          min="0"
-          step="0.01"
-          value={form.callPerMin}
-          onChange={(e) => setRate("callPerMin", e.target.value)}
-        />
-        <Input
-          label="Video call credits/min"
-          type="number"
-          min="0"
-          step="0.01"
-          value={form.videoPerMin}
-          onChange={(e) => setRate("videoPerMin", e.target.value)}
-        />
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={savePricing} loading={saving}>
-          Save Pricing
-        </Button>
-      </div>
     </div>
   );
 }
@@ -1863,9 +1762,6 @@ function EditAdvisorModal({
     expertise: (profile?.expertise || []).join(", "),
     styles: (profile?.styles || []).join(", "),
     languages: (profile?.languages || []).join(", "),
-    chatPerMin: profile?.pricing?.chatPerMin?.toString() || "",
-    callPerMin: profile?.pricing?.callPerMin?.toString() || "",
-    videoPerMin: profile?.pricing?.videoPerMin?.toString() || "",
     bio: profile?.bio || "",
     detailedDescription: profile?.detailedDescription || "",
     isOnline: !!profile?.isOnline,
@@ -1916,11 +1812,6 @@ function EditAdvisorModal({
         languages: form.languages,
         bio: form.bio,
         detailedDescription: form.detailedDescription,
-        pricing: {
-          chatPerMin: form.chatPerMin,
-          callPerMin: form.callPerMin,
-          videoPerMin: form.videoPerMin,
-        },
         isOnline: form.isOnline,
         autoOnlineMode: form.autoOnlineMode,
         weeklySchedule: form.weeklySchedule,
@@ -2018,30 +1909,6 @@ function EditAdvisorModal({
           onChange={(e) => onChange("languages", e.target.value)}
           placeholder="Comma separated"
         />
-      </div>
-
-      <div className="mt-5">
-        <p className="text-sm font-semibold text-slate-700 mb-2">Credits Per Minute</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            label="Chat (credits/min)"
-            type="number"
-            value={form.chatPerMin}
-            onChange={(e) => onChange("chatPerMin", e.target.value)}
-          />
-          <Input
-            label="Call (credits/min)"
-            type="number"
-            value={form.callPerMin}
-            onChange={(e) => onChange("callPerMin", e.target.value)}
-          />
-          <Input
-            label="Video (credits/min)"
-            type="number"
-            value={form.videoPerMin}
-            onChange={(e) => onChange("videoPerMin", e.target.value)}
-          />
-        </div>
       </div>
 
       <div className="mt-5">

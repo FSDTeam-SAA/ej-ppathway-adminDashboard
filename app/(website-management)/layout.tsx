@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
@@ -14,7 +15,9 @@ import {
   StarIcon,
   ApproveIcon,
   ShieldIcon,
-  LogoutIcon
+  LogoutIcon,
+  MenuIcon,
+  CloseIcon
 } from "../components/Icons";
 
 type Item = {
@@ -56,6 +59,19 @@ const GROUPS = ["General", "Pages", "Forms", "Curation", "Submissions"] as const
 export default function WebsiteManagementLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading, logout, hasPermission } = useAuth();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [drawerOpen]);
 
   if (loading || !user) return <FullPageLoader />;
 
@@ -72,73 +88,122 @@ export default function WebsiteManagementLayout({ children }: { children: React.
     );
   }
 
+  const NavContent = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <>
+      <div className="px-5 py-5 border-b border-slate-200">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#0a7a90] mb-2"
+        >
+          <ChevronLeftIcon size={14} /> Back to Admin
+        </Link>
+        <div className="font-semibold text-slate-900">Website Management</div>
+        <div className="text-xs text-slate-500 mt-0.5">Manage every page of the public site</div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto py-3 px-3">
+        {GROUPS.map((group) => {
+          const items = ITEMS.filter((it) => it.group === group);
+          if (!items.length) return null;
+          return (
+            <div key={group} className="mb-4">
+              <div className="px-3 mb-1 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                {group}
+              </div>
+              <ul className="space-y-0.5">
+                {items.map((it) => {
+                  const isActive =
+                    it.href === "/website-management"
+                      ? pathname === "/website-management"
+                      : pathname?.startsWith(it.href);
+                  const Icon = it.icon;
+                  return (
+                    <li key={it.href}>
+                      <Link
+                        href={it.href}
+                        onClick={onNavigate}
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          isActive
+                            ? "bg-[#0a7a90] text-white font-medium"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Icon size={16} />
+                        <span className="truncate">{it.label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className="p-3 border-t border-slate-200">
+        <div className="px-3 py-2 mb-2 text-xs text-slate-500 truncate">
+          Signed in as <span className="font-medium text-slate-800">{user.name}</span>
+        </div>
+        <button
+          type="button"
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium text-sm"
+        >
+          <LogoutIcon size={16} /> Log out
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <aside className="hidden md:flex flex-col w-72 shrink-0 bg-white border-r border-slate-200 h-screen sticky top-0">
-        <div className="px-5 py-5 border-b border-slate-200">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#0a7a90] mb-2"
-          >
-            <ChevronLeftIcon size={14} /> Back to Admin
-          </Link>
-          <div className="font-semibold text-slate-900">Website Management</div>
-          <div className="text-xs text-slate-500 mt-0.5">Manage every page of the public site</div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-3 px-3">
-          {GROUPS.map((group) => {
-            const items = ITEMS.filter((it) => it.group === group);
-            if (!items.length) return null;
-            return (
-              <div key={group} className="mb-4">
-                <div className="px-3 mb-1 text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
-                  {group}
-                </div>
-                <ul className="space-y-0.5">
-                  {items.map((it) => {
-                    const isActive =
-                      it.href === "/website-management"
-                        ? pathname === "/website-management"
-                        : pathname?.startsWith(it.href);
-                    const Icon = it.icon;
-                    return (
-                      <li key={it.href}>
-                        <Link
-                          href={it.href}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                            isActive
-                              ? "bg-[#0a7a90] text-white font-medium"
-                              : "text-slate-700 hover:bg-slate-100"
-                          }`}
-                        >
-                          <Icon size={16} />
-                          <span className="truncate">{it.label}</span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-slate-200">
-          <div className="px-3 py-2 mb-2 text-xs text-slate-500 truncate">
-            Signed in as <span className="font-medium text-slate-800">{user.name}</span>
-          </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium text-sm"
-          >
-            <LogoutIcon size={16} /> Log out
-          </button>
-        </div>
+        <NavContent />
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      {drawerOpen ? (
+        <div className="fixed inset-0 z-[700] md:hidden">
+          <button
+            type="button"
+            aria-label="Close website navigation"
+            className="absolute inset-0 bg-slate-900/45"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <aside className="relative flex h-full w-[min(19rem,calc(100vw-3rem))] flex-col bg-white shadow-2xl">
+            <div className="flex h-14 items-center justify-between border-b border-slate-200 px-4">
+              <div className="text-sm font-semibold text-slate-900">Website Management</div>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+                aria-label="Close menu"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+            <NavContent onNavigate={() => setDrawerOpen(false)} />
+          </aside>
+        </div>
+      ) : null}
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur md:hidden">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+            aria-label="Open website menu"
+          >
+            <MenuIcon size={22} />
+          </button>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-slate-900">Website Management</div>
+            <div className="truncate text-xs text-slate-500">Public site content</div>
+          </div>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }
