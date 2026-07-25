@@ -11,7 +11,7 @@ import { Input, Textarea } from "../../../components/ui/Input";
 import { Skeleton, CardSkeleton } from "../../../components/Skeleton";
 import { ChevronLeftIcon } from "../../../components/Icons";
 import { MapPin } from "lucide-react";
-import { api, ApiError } from "../../../lib/api";
+import { api, ApiError, API_BASE, getAccessToken } from "../../../lib/api";
 import { useToast } from "../../../lib/toast";
 import { formatDate } from "../../../lib/format";
 import { useCountryName, formatLocation } from "../../../lib/countries";
@@ -20,6 +20,36 @@ import type { AdvisorApplication } from "../../../lib/types";
 
 function isAudioMediaUrl(url: string) {
   return /\.(aac|aiff|flac|m4a|mp3|ogg|opus|wav)(\?|#|$)/i.test(url);
+}
+
+function isDirectBrowserUrl(url?: string) {
+  return /^(https?:|data:|blob:)/i.test(String(url || ""));
+}
+
+async function fetchContractAssetBlob(
+  applicationId: string,
+  asset: "signature" | "signed-pdf",
+) {
+  const token = getAccessToken();
+  const res = await fetch(
+    `${API_BASE}/admin/advisor-applications/${applicationId}/contract/${asset}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+  );
+
+  if (!res.ok) {
+    let message = `Contract asset request failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      message = body.message || message;
+    } catch {
+      // keep default message
+    }
+    throw new ApiError(message, res.status, null);
+  }
+
+  return res.blob();
 }
 
 export default function ApplicationDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +61,9 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
 
   const [data, setData] = useState<AdvisorApplication | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState("");
+  const [signaturePreviewError, setSignaturePreviewError] = useState("");
+  const [signedCopyDownloading, setSignedCopyDownloading] = useState(false);
 
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -77,6 +110,74 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    const rawUrl = data?.contract?.signatureImageUrl || "";
+    setSignaturePreviewError("");
+
+    if (!rawUrl) {
+      setSignaturePreviewUrl("");
+      return;
+    }
+
+    if (isDirectBrowserUrl(rawUrl)) {
+      setSignaturePreviewUrl(rawUrl);
+      return;
+    }
+
+    let active = true;
+    let objectUrl = "";
+
+    fetchContractAssetBlob(id, "signature")
+      .then((blob) => {
+        if (!active) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSignaturePreviewUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setSignaturePreviewUrl("");
+        setSignaturePreviewError(
+          err instanceof ApiError ? err.message : "Failed to load signature",
+        );
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [data?.contract?.signatureImageUrl, id]);
+
+  const downloadSignedCopy = async () => {
+    const rawUrl = data?.contract?.signedPdfUrl;
+    if (!rawUrl) return;
+
+    setSignedCopyDownloading(true);
+    try {
+      if (isDirectBrowserUrl(rawUrl)) {
+        const a = document.createElement("a");
+        a.href = rawUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.download = `signed-advisor-contract-${id}.pdf`;
+        a.click();
+        return;
+      }
+
+      const blob = await fetchContractAssetBlob(id, "signed-pdf");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `signed-advisor-contract-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to download signed copy";
+      toast.error(msg);
+    } finally {
+      setSignedCopyDownloading(false);
+    }
+  };
 
   const submitSchedule = async () => {
     if (!scheduleDate || !scheduleTime) {
@@ -503,24 +604,29 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                     {data.contract.signatureImageUrl ? (
                       <div>
                         <div className="text-xs text-slate-500 mb-1.5">Signature</div>
-                        <img
-                          src={data.contract.signatureImageUrl}
-                          alt="Applicant signature"
-                          className="max-h-24 rounded-lg border border-slate-100 bg-white p-2"
-                        />
+                        {signaturePreviewUrl ? (
+                          <img
+                            src={signaturePreviewUrl}
+                            alt="Applicant signature"
+                            className="max-h-24 rounded-lg border border-slate-100 bg-white p-2"
+                          />
+                        ) : (
+                          <div className="rounded-lg border border-slate-100 bg-white p-3 text-xs text-slate-500">
+                            {signaturePreviewError || "Loading signature..."}
+                          </div>
+                        )}
                       </div>
                     ) : null}
 
                     <div className="flex flex-wrap gap-2 pt-1">
                       {data.contract.signedPdfUrl ? (
-                        <a
-                          href={data.contract.signedPdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
+                        <Button
+                          size="sm"
+                          onClick={downloadSignedCopy}
+                          disabled={signedCopyDownloading}
                         >
-                          <Button size="sm">Download signed copy</Button>
-                        </a>
+                          {signedCopyDownloading ? "Downloading..." : "Download signed copy"}
+                        </Button>
                       ) : null}
                       {data.contract.url ? (
                         <a
