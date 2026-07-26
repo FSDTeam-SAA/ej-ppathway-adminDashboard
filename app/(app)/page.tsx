@@ -65,7 +65,9 @@ export default function DashboardPage() {
 
   const suffix = periodSuffix[period];
   const m = data?.metrics;
-  const transactions = data?.recentTransactions || [];
+  const transactions = (data?.recentTransactions || []).filter(
+    (transaction) => transaction.type !== "platform_commission",
+  );
 
   const planBars = useMemo(
     () =>
