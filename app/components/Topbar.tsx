@@ -15,6 +15,9 @@ export function Topbar({
 }) {
   const { user } = useAuth();
   const [q, setQ] = useState("");
+  const displayRole = user?.role === "sub_admin"
+    ? user.roleLabel || user.location || user.roleKey || "Sub Admin"
+    : user?.role || "admin";
 
   return (
     <div className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 bg-[#dff1f6]/90 px-4 py-3 backdrop-blur sm:px-6 md:px-8 md:py-4">
@@ -60,7 +63,7 @@ export function Topbar({
             <div className="text-sm font-semibold text-slate-900">
               {user?.name || "Admin"}
             </div>
-            <div className="text-xs text-slate-500">{user?.role}</div>
+            <div className="text-xs text-slate-500">{displayRole}</div>
           </div>
         </div>
       </div>

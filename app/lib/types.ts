@@ -23,6 +23,7 @@ export interface AdminUser {
   location?: string;
   permissions?: string[];
   roleKey?: string;
+  roleLabel?: string;
   jobTitle?: string;
   isVerified?: boolean;
   isOnline?: boolean;

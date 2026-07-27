@@ -29,6 +29,21 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const PERMISSION_ALIASES: Record<string, string[]> = {
+  "users.manage": ["users.view", "users.edit", "users.suspend", "users.delete"],
+  "advisors.manage": ["advisors.view", "advisors.edit", "advisors.suspend", "advisors.reactivate", "advisors.reset_password"],
+  "advisors.approve": ["approvals.view", "approvals.interview", "approvals.approve", "approvals.decline", "approvals.contract"],
+  "sessions.manage": ["sessions.view", "sessions.cancel", "sessions.modify", "recordings.view"],
+  "compliance.manage": ["compliance.view", "compliance.investigate", "compliance.warn", "compliance.suspend_accounts"],
+  "finance.manage": ["finance.view", "finance.transactions", "finance.refunds", "finance.chargebacks", "finance.approve_payouts", "finance.release_payouts"],
+  "subscriptions.manage": ["plans.view", "plans.create", "plans.edit", "plans.delete"],
+  "cms.manage": ["cms.pages", "cms.faqs", "cms.blogs", "cms.legal"],
+  "chats.manage": ["chat.view", "chat.reply", "chat.escalate"],
+  "faq.manage": ["cms.faqs", "reviews.view", "reviews.remove", "reviews.feature", "testimonials.view", "testimonials.approve", "testimonials.remove"],
+  "reviews.manage": ["reviews.view", "reviews.remove", "reviews.feature"],
+  "sub_admins.manage": ["subadmins.view", "subadmins.add", "subadmins.edit_permissions", "subadmins.remove"],
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -99,7 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (perm: string) => {
       if (!user) return false;
       if (user.role === "admin") return true;
-      return (user.permissions || []).includes(perm);
+      const permissions = user.permissions || [];
+      if (permissions.includes("*") || permissions.includes(perm)) return true;
+      return (PERMISSION_ALIASES[perm] || []).some((alias) => permissions.includes(alias));
     },
     [user]
   );
