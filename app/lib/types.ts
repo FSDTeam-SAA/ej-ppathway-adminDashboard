@@ -224,6 +224,7 @@ export interface AdvisorApplication {
     | "under_review"
     | "interview_pending"
     | "scheduled"
+    | "awaiting_submission"
     | "awaiting_signature"
     | "awaiting_approval"
     | "approved"
@@ -418,6 +419,7 @@ export interface Transaction {
   status: string;
   user?: AdminUser;
   advisor?: AdminUser;
+  session?: SessionItem | string;
   plan?: { _id?: string; name?: string } | string;
   amount: number;
   currency?: string;

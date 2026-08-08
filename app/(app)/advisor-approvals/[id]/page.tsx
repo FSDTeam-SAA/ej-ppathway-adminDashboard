@@ -18,6 +18,19 @@ import { useCountryName, formatLocation } from "../../../lib/countries";
 import { useCurrencyCatalog } from "../../../lib/currency";
 import type { AdvisorApplication } from "../../../lib/types";
 
+const APPLICATION_STATUS_OPTIONS = [
+  { value: "new", label: "Application" },
+  { value: "pending_review", label: "Pending Review" },
+  { value: "scheduled", label: "Interview Scheduled" },
+  { value: "live_interview", label: "Live Interview" },
+  { value: "under_review", label: "Under Review" },
+  { value: "awaiting_signature", label: "Awaiting Signature" },
+  { value: "awaiting_approval", label: "Awaiting Approval" },
+  { value: "awaiting_submission", label: "Awaiting Submission" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Not Selected" },
+];
+
 function isAudioMediaUrl(url: string) {
   return /\.(aac|aiff|flac|m4a|mp3|ogg|opus|wav)(\?|#|$)/i.test(url);
 }
@@ -261,6 +274,15 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
   };
 
   const updateStatus = async (nextStatus: string) => {
+    if (nextStatus === data?.status) return;
+    if (nextStatus === "approved") {
+      setConfirmApprove(true);
+      return;
+    }
+    if (nextStatus === "rejected") {
+      setConfirmReject(true);
+      return;
+    }
     setStatusLoading(true);
     try {
       await api.patch(`/admin/advisor-applications/${id}/status`, { status: nextStatus });
@@ -382,12 +404,11 @@ export default function ApplicationDetailsPage({ params }: { params: Promise<{ i
                           onChange={(e) => updateStatus(e.target.value)}
                           disabled={statusLoading || approveLoading || rejectLoading}
                         >
-                          <option value="new">Application</option>
-                          <option value="pending_review">Pending Review</option>
-                          <option value="live_interview">Live Interview</option>
-                          <option value="under_review">Under Review</option>
-                          {data.status === "approved" ? <option value="approved">Approved</option> : null}
-                          {data.status === "rejected" ? <option value="rejected">Not Selected</option> : null}
+                          {APPLICATION_STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       </label>
                     </div>
@@ -845,11 +866,7 @@ function ChipsField({ label, items }: { label: string; items: string[] }) {
 }
 
 function toApplicationStatusValue(data: AdvisorApplication) {
-  if (data.status === "approved") return "approved";
-  if (data.status === "rejected") return "rejected";
-  if (data.status === "pending_review") return "pending_review";
-  if (data.status === "live_interview" || data.status === "scheduled") return "live_interview";
-  if (data.status === "under_review") return "under_review";
+  if (APPLICATION_STATUS_OPTIONS.some((option) => option.value === data.status)) return data.status;
   return "new";
 }
 

@@ -119,7 +119,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
   const sessions = data?.recentSessions || [];
   const sessionTotal = sessions.length;
   const displayTransactions = (data?.recentTransactions || []).filter(
-    (transaction) => transaction.type !== "platform_commission",
+    (transaction) => transaction.type === "session_charge",
   );
   const sessionTotalPages = Math.max(1, Math.ceil(sessionTotal / sessionLimit));
   const normalizedSessionPage = Math.min(sessionPage, sessionTotalPages);
@@ -263,9 +263,9 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <section className="mb-6">
-              <h3 className="text-lg font-semibold text-slate-900 mb-1">Transactions & Credit Refunds</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">Session Charges</h3>
               <p className="mb-3 text-sm text-slate-500">
-                Credit purchases, session charges, advisor earnings, payouts, and credit refunds.
+                Session charge history with the actual minutes used.
               </p>
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                 {displayTransactions.length > 0 ? (
@@ -275,7 +275,8 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                         <tr className="border-b border-slate-100">
                           <th className="px-4 py-3 font-semibold">Transaction ID</th>
                           <th className="px-4 py-3 font-semibold">Type</th>
-                          <th className="px-4 py-3 font-semibold">Credit / Amount</th>
+                          <th className="px-4 py-3 font-semibold">Minutes</th>
+                          <th className="px-4 py-3 font-semibold">Credits Charged</th>
                           <th className="px-4 py-3 font-semibold">Status</th>
                           <th className="px-4 py-3 font-semibold text-right">Date</th>
                         </tr>
@@ -288,6 +289,9 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                             </td>
                             <td className="px-4 py-3 capitalize text-slate-600">
                               {t.type.replace(/_/g, " ")}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">
+                              {formatSessionMinutes(t)}
                             </td>
                             <td
                               className={`px-4 py-3 font-semibold ${
@@ -312,7 +316,7 @@ export default function UserDetailsPage({ params }: { params: Promise<{ id: stri
                     </table>
                   </div>
                 ) : (
-                  <p className="px-4 py-6 text-sm text-slate-500">No transaction history</p>
+                  <p className="px-4 py-6 text-sm text-slate-500">No session charge history</p>
                 )}
               </div>
               {(data.refunds || []).length > 0 && (
@@ -509,6 +513,15 @@ function formatTransactionAmount(
     return formatCredits(transaction.amount);
   }
   return formatCurrency(transaction.amount);
+}
+
+function formatSessionMinutes(transaction: NonNullable<UserDetailsResponse["recentTransactions"]>[number]) {
+  const session = typeof transaction.session === "object" ? transaction.session : null;
+  const actualSeconds = Number(session?.actualDurationSec || 0);
+  if (actualSeconds > 0) return `${Math.ceil(actualSeconds / 60)} min`;
+  const bookedMinutes = Number(session?.durationMinutes || 0);
+  if (bookedMinutes > 0) return `${bookedMinutes} min`;
+  return "—";
 }
 
 function sessionIcon(type?: string) {

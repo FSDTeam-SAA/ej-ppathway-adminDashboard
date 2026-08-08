@@ -327,7 +327,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
-  const usageBlocks = mergeUsageBlocks(data?.creditUsageBlocks);
+  const creditPacks = Array.isArray(data?.creditPacks) ? data.creditPacks : DEFAULT_PACKS;
+  const usageBlocks = Array.isArray(data?.creditUsageBlocks) ? data.creditUsageBlocks : DEFAULT_USAGE_BLOCKS;
   return {
     signupFreeCredits: Number(data?.signupFreeCredits ?? 0),
     creditExpirationDays: Number(data?.creditExpirationDays ?? 60),
@@ -337,7 +338,7 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
       callPerMin: Number(data?.advisorCreditPricing?.callPerMin ?? 1),
       videoPerMin: Number(data?.advisorCreditPricing?.videoPerMin ?? 2),
     },
-    creditPacks: (data?.creditPacks?.length ? data.creditPacks : DEFAULT_PACKS).map((pack, index) => ({
+    creditPacks: creditPacks.map((pack, index) => ({
       id: pack.id || `credits_${index + 1}`,
       label: pack.label || `${pack.credits || 0} Credits`,
       credits: Number(pack.credits || 0),
@@ -363,15 +364,6 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
       sortOrder: Number(block.sortOrder ?? index + 1),
     })),
   };
-}
-
-function mergeUsageBlocks(blocks?: CreditUsageBlock[]) {
-  const source = blocks?.length ? blocks : DEFAULT_USAGE_BLOCKS;
-  const merged = source.filter((block) => block.id !== "session_recording");
-  for (const defaultBlock of DEFAULT_USAGE_BLOCKS) {
-    if (!merged.some((block) => block.id === defaultBlock.id)) merged.push(defaultBlock);
-  }
-  return merged;
 }
 
 function patchPack(settings: CreditSettings, setSettings: (next: CreditSettings) => void, index: number, patch: Partial<CreditPack>) {

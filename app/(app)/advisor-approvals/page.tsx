@@ -23,8 +23,12 @@ const TABS = [
   { value: "all", label: "All" },
   { value: "new", label: "Application" },
   { value: "pending_review", label: "Pending Review" },
+  { value: "scheduled", label: "Interview Scheduled" },
   { value: "live_interview", label: "Live Interview" },
   { value: "under_review", label: "Under Review" },
+  { value: "awaiting_signature", label: "Awaiting Signature" },
+  { value: "awaiting_approval", label: "Awaiting Approval" },
+  { value: "awaiting_submission", label: "Awaiting Submission" },
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Not Selected" },
 ];
