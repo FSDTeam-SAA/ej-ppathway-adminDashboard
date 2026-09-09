@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Topbar } from "../components/Topbar";
 import { api, ApiError } from "../lib/api";
 import type { DashboardOverview, DashboardPeriod, Transaction } from "../lib/types";
-import { AreaChart, BarChartSimple, DonutChart, MiniArea } from "../components/charts";
+import { AreaChart, BarChartSimple, DonutChart } from "../components/charts";
 import { useToast } from "../lib/toast";
 import { StatGridSkeleton, CardSkeleton } from "../components/Skeleton";
+import { formatCredits, formatTransactionAmount } from "../lib/transaction-format";
 import { formatCompact, formatCurrency } from "../lib/format";
 import { Avatar } from "../components/ui/Avatar";
 import {
@@ -216,7 +217,7 @@ export default function DashboardPage() {
                 <CardHeader title="Total Refunds" subtitle="Refunds issued by period" noFilter />
                 <BarChartSimple data={refundBars} formatValue={(v) => `${Math.round(v)}`} />
                 <p className="text-xs text-slate-400 mt-2 text-center">
-                  {formatCurrency(data?.refunds?.amountYear)} refunded this year
+                  {formatCredits(data?.refunds?.creditsYear)} + {formatCurrency(data?.refunds?.amountYear)} refunded this year
                 </p>
               </Card>
 
@@ -369,14 +370,14 @@ function StatBlock({ label, value, icon, color }: { label: string; value: string
       <div className="mt-3 text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-2xl md:text-3xl font-bold text-slate-900">{value}</div>
       <div className="absolute right-0 bottom-0 w-28 opacity-90 pointer-events-none">
-        <MiniArea values={[2, 4, 3, 5, 7, 6, 8, 7, 9, 8]} color={color} height={48} />
+
       </div>
     </div>
   );
 }
 
 function TransactionRow({ tx }: { tx: Transaction }) {
-  const amountText = `${tx.amount >= 0 ? "+" : ""}${formatCurrency(tx.amount)}`;
+  const amountText = formatTransactionAmount(tx);
   const amountClass = tx.amount >= 0 ? "text-emerald-600" : "text-red-500";
   return (
     <tr className="border-b border-slate-50 last:border-0">

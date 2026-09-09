@@ -18,7 +18,9 @@ import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import { useCountries } from "../../lib/countries";
 import { HyperwalletDropInButton } from "../../components/payout/HyperwalletDropInButton";
-import { formatCurrency, formatDate, formatNumber } from "../../lib/format";
+import { AdminPaymentForm } from "../../components/payout/AdminPaymentForm";
+import { TipHistory } from "../../components/payout/TipHistory";
+import { formatCurrency, formatDate, formatNumber, formatDuration } from "../../lib/format";
 import type {
   PayoutConfig,
   PayoutStats,
@@ -29,11 +31,13 @@ import type {
 
 const TABS = [
   { value: "accounts", label: "Advisor Accounts" },
+  { value: "tips", label: "Tip History" },
   { value: "queue", label: "Payout Queue" },
   { value: "settings", label: "Settings" },
 ];
 
 const credits = (n?: number | null) => `${formatNumber(Math.round(Number(n || 0)))} cr`;
+const percent = (n?: number | null) => `${formatNumber(Number(n || 0))}%`;
 
 export default function PayoutsPage() {
   const toast = useToast();
@@ -54,11 +58,11 @@ export default function PayoutsPage() {
 
   return (
     <>
-      <Topbar searchPlaceholder="Search advisors by name or email ..." onSearch={setQ} />
+      <Topbar searchPlaceholder={tab === "tips" ? "Search tips by user, advisor, transaction or session ..." : "Search advisors by name or email ..."} onSearch={setQ} />
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Payout Management"
-          description="Pay advisors from their earned credits via Hyperwallet."
+          description="Pay completed session work at admin-set amounts and send advisors their net tips."
           breadcrumb={[{ label: "Dashboard", href: "/" }, { label: "Payouts" }]}
         />
 
@@ -78,9 +82,9 @@ export default function PayoutsPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
           <SummaryCard
-            label="Payable Pool"
+            label="Available Net Tips"
             value={formatCurrency(stats?.payable.usd)}
-            note={`${credits(stats?.payable.credits)} across advisors`}
+            note={`${formatDuration(stats?.payable.unpaidSeconds)} unassigned session work`}
             icon={<WalletIcon size={20} />}
             color="#0a7a90"
           />
@@ -119,6 +123,7 @@ export default function PayoutsPage() {
         </div>
 
         {tab === "accounts" && <AccountsTab q={q} config={cfg} onChanged={refreshStats} />}
+        {tab === "tips" && <TipHistory q={q} />}
         {tab === "queue" && <QueueTab q={q} onChanged={refreshStats} />}
         {tab === "settings" && <SettingsTab onSaved={refreshStats} />}
       </main>
@@ -180,7 +185,8 @@ function AccountsTab({
             <thead className="text-left text-slate-500">
               <tr className="border-b border-slate-100">
                 <th className="px-5 py-4 font-medium">Advisor</th>
-                <th className="px-5 py-4 font-medium">Available</th>
+                <th className="px-5 py-4 font-medium">Unpaid Work / Net Tips</th>
+                <th className="px-5 py-4 font-medium">Tip Earnings (All Time)</th>
                 <th className="px-5 py-4 font-medium">Pending</th>
                 <th className="px-5 py-4 font-medium">Payout Method</th>
                 <th className="px-5 py-4 font-medium text-right">Action</th>
@@ -189,7 +195,7 @@ function AccountsTab({
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-slate-500">
+                  <td colSpan={6} className="text-center py-10 text-slate-500">
                     No advisors
                   </td>
                 </tr>
@@ -208,7 +214,15 @@ function AccountsTab({
                     <td className="px-5 py-3">
                       <div className="font-medium text-emerald-600">{formatCurrency(row.availableUsd)}</div>
                       <div className="text-xs text-slate-400">
-                        Services {formatCurrency(row.serviceAvailableUsd)} · Tips {formatCurrency(row.tipAvailableUsd)}
+                        {formatDuration(row.work.unpaidSeconds)} · {row.work.unpaidSessions} sessions awaiting pricing
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium text-emerald-700">
+                        Net {formatCurrency(row.tipBreakdown.netUsd)}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Gross {formatCurrency(row.tipBreakdown.grossUsd)} · Deductions -{formatCurrency(row.tipBreakdown.deductionsUsd)} ({percent(row.tipBreakdown.deductionPercent)})
                       </div>
                     </td>
                     <td className="px-5 py-3">
@@ -288,8 +302,6 @@ function ManageAccountModal({
   const [busy, setBusy] = useState<string | null>(null);
 
   // form state
-  const [payUsd, setPayUsd] = useState("");
-  const [note, setNote] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [city, setCity] = useState("");
@@ -346,27 +358,6 @@ function ManageAccountModal({
   const removeMethod = () =>
     run("remove", () => api.delete(`/admin/payouts/accounts/${advisorId}/method`), "Method removed");
 
-  const initiatePayout = (processNow: boolean) => {
-    const usd = Number(payUsd);
-    if (!Number.isFinite(usd) || usd <= 0) {
-      toast.error("Enter a USD payout amount");
-      return;
-    }
-    return run(
-      processNow ? "pay" : "queue",
-      () =>
-        api.post("/admin/payouts", {
-          advisorId,
-          amountUsd: usd,
-          note: note || undefined,
-          process: processNow,
-        }),
-      processNow ? "Payout sent" : "Payout queued"
-    ).then(() => {
-      setPayUsd("");
-      setNote("");
-    });
-  };
 
   const acct = data?.account;
   const profileComplete = [dateOfBirth, addressLine1, city, stateProvince, country, postalCode].every(
@@ -394,10 +385,41 @@ function ManageAccountModal({
             <div className="text-right">
               <div className="text-lg font-bold text-emerald-600">{formatCurrency(data.balance.availableUsd)}</div>
               <div className="text-xs text-slate-400">
-                Services {formatCurrency(data.balance.serviceAvailableUsd)} · Net tips {formatCurrency(data.balance.tipAvailableUsd)}
+                Net tips available · {formatDuration(data.work.unpaidSeconds)} unpaid work
               </div>
             </div>
           </div>
+
+          {/* tip earnings */}
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="font-semibold text-slate-800">Tip earnings breakdown</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Actual verified App Store and Play Store proceeds. Direct tips have no store deduction.
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <TipBreakdownValue label="Gross tips" value={formatCurrency(data.balance.tipBreakdown.grossUsd)} />
+              <TipBreakdownValue
+                label="Store commission"
+                value={`-${formatCurrency(data.balance.tipBreakdown.commissionUsd)}`}
+                tone="deduction"
+              />
+              <TipBreakdownValue
+                label="Store tax"
+                value={`-${formatCurrency(data.balance.tipBreakdown.taxUsd)}`}
+                tone="deduction"
+              />
+              <TipBreakdownValue
+                label="Net to advisor"
+                value={formatCurrency(data.balance.tipBreakdown.netUsd)}
+                tone="net"
+              />
+            </div>
+            <div className="mt-3 text-xs text-slate-500">
+              Total deducted: -{formatCurrency(data.balance.tipBreakdown.deductionsUsd)} ({percent(data.balance.tipBreakdown.deductionPercent)}) · App Store {data.balance.tipBreakdown.appStoreCount} · Play Store {data.balance.tipBreakdown.playStoreCount} · Direct {Math.max(0, data.balance.tipBreakdown.count - data.balance.tipBreakdown.storeTipCount)}
+            </div>
+          </div>
+
+          <AdminPaymentForm advisorId={advisorId} tipAvailableUsd={data.balance.tipAvailableUsd} onChanged={() => { load(); onChanged(); }} />
 
           {/* account status */}
           {!acct?.configured ? (
@@ -526,48 +548,6 @@ function ManageAccountModal({
                 </div>
               </div>
 
-              {/* initiate payout */}
-              <div className="rounded-xl border border-[#0a7a90]/30 bg-[#e6f2f6]/40 p-4">
-                <div className="font-semibold text-slate-800 mb-1">Send a payout</div>
-                <div className="text-xs text-slate-500 mb-3">
-                  Paid in USD. Service earnings convert at {formatCurrency(rate)} per credit; net store tips remain USD.
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="USD to pay out"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={payUsd}
-                    onChange={(e) => setPayUsd(e.target.value)}
-                    placeholder={`min ${formatCurrency(data.config.minPayoutCredits * rate)}`}
-                  />
-                  <div className="flex items-end">
-                    <div className="h-11 flex items-center px-4 rounded-lg bg-white border border-slate-200 w-full">
-                      <span className="text-slate-500 text-sm">Payout amount:&nbsp;</span>
-                      <span className="font-semibold text-slate-800">{formatCurrency(Number(payUsd) || 0)}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <Input label="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    loading={busy === "pay"}
-                    disabled={!acct.hasMethod}
-                    onClick={() => initiatePayout(true)}
-                  >
-                    <Send size={15} /> Pay now
-                  </Button>
-                  <Button variant="outline" loading={busy === "queue"} onClick={() => initiatePayout(false)}>
-                    Queue without sending
-                  </Button>
-                  {!acct.hasMethod && (
-                    <span className="text-xs text-amber-600 self-center">Add a payout method to send.</span>
-                  )}
-                </div>
-              </div>
             </>
           )}
 
@@ -579,7 +559,7 @@ function ManageAccountModal({
                 {data.recentPayouts.map((p) => (
                   <div key={p._id} className="flex items-center justify-between text-sm border border-slate-100 rounded-lg px-3 py-2">
                     <div className="text-slate-600">{formatDate(p.createdAt, true)}</div>
-                    <div className="font-medium">{formatCurrency(p.amountUsd)}</div>
+                    <div className="font-medium">{formatCurrency(p.amountUsd)}<div className="text-xs text-slate-500">{p.payoutServiceUsd !== undefined ? `Sessions ${formatCurrency(p.payoutServiceUsd)} · Tips ${formatCurrency(p.payoutTipUsd)}` : "Legacy payout"}</div></div>
                     <StatusBadge status={p.withdrawalStatus} />
                   </div>
                 ))}
@@ -654,8 +634,10 @@ function QueueTab({ q, onChanged }: { q: string; onChanged: () => void }) {
 
   const approve = (id: string) =>
     act(id, () => api.patch(`/admin/finance/payouts/${id}/approve`, {}), "Payout approved");
-  const markPaid = (id: string) =>
-    act(id, () => api.patch(`/admin/finance/payouts/${id}/mark-paid`, {}), "Marked as paid");
+  const markPaid = (id: string) => {
+    if (!window.confirm("Have you already transferred this payment to the advisor? Mark paid only records your external transfer; it does not send money.")) return;
+    return act(id, () => api.patch(`/admin/finance/payouts/${id}/mark-paid`, {}), "Marked as paid");
+  };
   const retry = (id: string) => act(id, () => api.post(`/admin/payouts/${id}/retry`, {}), "Payout retried");
   const sync = (id: string) => act(id, () => api.post(`/admin/payouts/${id}/sync`, {}), "Status synced");
 
@@ -724,7 +706,7 @@ function QueueTab({ q, onChanged }: { q: string; onChanged: () => void }) {
                     <td className="px-5 py-3">
                       <div className="font-medium">{formatCurrency(p.amountUsd)}</div>
                       <div className="text-xs text-slate-400">
-                        {credits(p.payoutCredits || 0)} · Tips {formatCurrency(p.payoutTipUsd || 0)}
+                        {p.payoutServiceUsd !== undefined ? `Sessions ${formatCurrency(p.payoutServiceUsd)}` : "Legacy service payout"} · Tips {formatCurrency(p.payoutTipUsd || 0)}
                       </div>
                     </td>
                     <td className="px-5 py-3 text-slate-600 capitalize">
@@ -733,7 +715,7 @@ function QueueTab({ q, onChanged }: { q: string; onChanged: () => void }) {
                     <td className="px-5 py-3 text-slate-600">{formatDate(p.createdAt, true)}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-end gap-2 flex-wrap">
-                        {status === "requested" && (
+                        {(status === "requested" || status === "approved") && (
                           <>
                             <Button variant="success" size="sm" loading={busyId === p._id} onClick={() => approve(p._id)}>
                               Approve & send
@@ -750,9 +732,6 @@ function QueueTab({ q, onChanged }: { q: string; onChanged: () => void }) {
                           <>
                             <Button variant="outline" size="sm" loading={busyId === p._id} onClick={() => sync(p._id)}>
                               <RefreshCw size={14} /> Sync
-                            </Button>
-                            <Button variant="ghost" size="sm" loading={busyId === p._id} onClick={() => markPaid(p._id)}>
-                              Mark paid
                             </Button>
                           </>
                         )}
@@ -801,7 +780,7 @@ function QueueTab({ q, onChanged }: { q: string; onChanged: () => void }) {
         }}
         onConfirm={doReject}
         title="Reject payout?"
-        description="The held credits are returned to the advisor's earnings balance."
+        description="Tip funds are returned; selected sessions become available for a new payment."
         confirmText="Reject payout"
         danger
         loading={busyId === rejectFor?._id}
@@ -835,9 +814,7 @@ function SettingsTab({ onSaved }: { onSaved: () => void }) {
       const r = await api.patch<PayoutConfig>("/admin/payouts/config", {
         hyperwalletEnabled: cfg.hyperwalletEnabled,
         provider: cfg.provider,
-        payoutCreditUsdRate: cfg.payoutCreditUsdRate,
         payoutCurrency: cfg.payoutCurrency,
-        minPayoutCredits: cfg.minPayoutCredits,
       });
       setCfg(r.data || cfg);
       toast.success("Payout settings saved");
@@ -864,7 +841,7 @@ function SettingsTab({ onSaved }: { onSaved: () => void }) {
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 max-w-2xl">
       <h2 className="text-xl font-bold text-slate-900 mb-1">Payout settings</h2>
       <p className="text-sm text-slate-500 mb-5">
-        Control how advisor credits convert to real money and how payouts are sent.
+        Configure how admin-approved USD payments are sent.
       </p>
 
       <div className="space-y-5">
@@ -897,34 +874,6 @@ function SettingsTab({ onSaved }: { onSaved: () => void }) {
           <option value="manual">Manual (mark paid only)</option>
         </Select>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Payout rate (USD per credit)"
-            type="number"
-            step="0.01"
-            min={0}
-            value={String(cfg.payoutCreditUsdRate)}
-            onChange={(e) => setCfg({ ...cfg, payoutCreditUsdRate: Number(e.target.value) })}
-          />
-          <Input
-            label="Payout currency"
-            value={cfg.payoutCurrency}
-            maxLength={3}
-            onChange={(e) => setCfg({ ...cfg, payoutCurrency: e.target.value.toUpperCase() })}
-          />
-          <Input
-            label="Minimum payout (credits)"
-            type="number"
-            min={0}
-            value={String(cfg.minPayoutCredits)}
-            onChange={(e) => setCfg({ ...cfg, minPayoutCredits: Number(e.target.value) })}
-          />
-          <div className="flex items-end">
-            <div className="h-11 w-full flex items-center px-4 rounded-lg bg-[#e6f2f6]/50 border border-slate-200 text-sm text-slate-600">
-              Min payout ≈ {formatCurrency(cfg.minPayoutCredits * cfg.payoutCreditUsdRate)}
-            </div>
-          </div>
-        </div>
 
         <Button onClick={save} loading={saving}>
           Save settings
@@ -937,6 +886,26 @@ function SettingsTab({ onSaved }: { onSaved: () => void }) {
 /* -------------------------------------------------------------------------- */
 /* Shared                                                                     */
 /* -------------------------------------------------------------------------- */
+
+function TipBreakdownValue({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "deduction" | "net";
+}) {
+  const valueColor =
+    tone === "net" ? "text-emerald-700" : tone === "deduction" ? "text-amber-700" : "text-slate-900";
+
+  return (
+    <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className={`mt-1 font-semibold ${valueColor}`}>{value}</div>
+    </div>
+  );
+}
 
 function SummaryCard({
   label,

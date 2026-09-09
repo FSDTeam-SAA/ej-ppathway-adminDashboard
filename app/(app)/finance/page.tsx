@@ -18,8 +18,9 @@ import { BulkActionsBar, BulkCheckbox } from "../../components/BulkActionsBar";
 import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { api, ApiError, API_BASE, getAccessToken } from "../../lib/api";
 import { useToast } from "../../lib/toast";
+import { formatTransactionAmount } from "../../lib/transaction-format";
 import { formatCurrency, formatDate } from "../../lib/format";
-import { AreaChart, DonutChart, MiniArea } from "../../components/charts";
+import { AreaChart, DonutChart } from "../../components/charts";
 import type {
   FinanceOverview,
   Transaction,
@@ -124,6 +125,7 @@ export default function FinancePage() {
       <main className="px-6 md:px-8 pb-10">
         <PageHeader
           title="Revenue & Finance"
+          description="Reporting periods use UTC. Cash receipts exclude credit spending."
           breadcrumb={[
             { label: "Dashboard", href: "/" },
             { label: "Revenue & Finance" },
@@ -148,25 +150,25 @@ export default function FinancePage() {
         {/* Top summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
           <SummaryCard
-            label="Platform Revenue"
+            label="Cash Receipts (USD)"
             value={formatCurrency(gross)}
             icon={<DollarIcon />}
             color="#34d399"
             note={PERIODS.find((p) => p.value === period)?.label}
           />
           <SummaryCard
-            label="Net Revenue"
+            label="Net Cash Movement (USD)"
             value={formatCurrency(net)}
             icon={<DollarIcon />}
             color="#0a7a90"
-            note="after payouts & refunds"
+            note="Includes net store tips; less paid payouts and cash refunds"
           />
           <SummaryCard
             label="Wallet Deposits"
             value={formatCurrency(overview?.wallet?.totalDeposits)}
             icon={<WalletIcon size={20} />}
             color="#60a5fa"
-            note={`${formatCurrency(overview?.wallet?.totalBalance)} held`}
+            note={`${formatCredits(overview?.wallet?.totalBalance)} held`}
           />
           <SummaryCard
             label="Pending Payouts"
@@ -211,12 +213,8 @@ export default function FinancePage() {
               <DonutChart
                 size={180}
                 data={[
-                  { label: "Voice", value: sources.voiceSessions || 0 },
-                  { label: "Video", value: sources.videoSessions || 0 },
-                  { label: "Chat", value: sources.chatSessions || 0 },
-                  { label: "Transcript", value: sources.subscriptionRevenue || 0 },
-                  { label: "Recordings", value: sources.recordingPurchases || 0 },
-                  { label: "Featured", value: sources.featuredAdvisorFees || 0 },
+                  { label: "Credit purchases", value: sources.creditPackRevenue || 0 },
+                  { label: "Subscriptions", value: sources.subscriptionRevenue || 0 },
                 ]}
               />
             ) : (
@@ -286,6 +284,13 @@ function TransactionsTab({
   const openedRef = useRef(false);
 
   const bulk = useBulkSelection(items);
+
+  useEffect(() => {
+    if (!initialTxnId || openedRef.current) return;
+    api.get<Transaction[]>("/admin/finance/transactions", { id: initialTxnId, limit: 1 })
+      .then((r) => { if (r.data?.[0]) { openedRef.current = true; setDetails(r.data[0]); onInitialTxnOpened?.(); } })
+      .catch(() => toast.error("Could not load transaction details"));
+  }, [initialTxnId, onInitialTxnOpened, toast]);
 
   useEffect(() => {
     setLoading(true);
@@ -405,8 +410,7 @@ function TransactionsTab({
                         <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
                         <td className="px-5 py-3">
                           <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
-                            {isPositive ? "+" : "-"}
-                            {formatCredits(Math.abs(t.amount))}
+                            {formatTransactionAmount(t)}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
@@ -451,8 +455,8 @@ function TransactionsTab({
                 <DetailRow label="Withdrawal status" value={details.withdrawalStatus} capitalize />
               )}
               <DetailRow
-                label="Credits"
-                value={(details.amount < 0 ? "-" : "+") + formatCredits(Math.abs(details.amount))}
+                label="Amount"
+                value={formatTransactionAmount(details)}
                 tone={details.amount < 0 ? "danger" : "success"}
               />
               <DetailRow label="Payment Method" value={details.provider || "—"} capitalize />
@@ -549,7 +553,7 @@ function SubscriptionRevenueTab({ q }: { q: string }) {
                       </td>
                       <td className="px-5 py-3">{t.user?.name || "—"}</td>
                       <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
-                      <td className="px-5 py-3 font-medium text-emerald-600">{formatCurrency(t.amount)}</td>
+                      <td className="px-5 py-3 font-medium text-emerald-600">{formatTransactionAmount(t)}</td>
                       <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
                       <td className="px-5 py-3 text-right">
                         <StatusBadge status={t.status} />
@@ -625,7 +629,7 @@ function RefundsTab({ q }: { q: string }) {
                         {t.txCode || `TXN-${t._id.slice(-4).toUpperCase()}`}
                       </td>
                       <td className="px-5 py-3">{t.user?.name || "—"}</td>
-                      <td className="px-5 py-3 font-medium text-red-600">{formatCurrency(t.amount)}</td>
+                      <td className="px-5 py-3 font-medium text-red-600">{formatTransactionAmount(t)}</td>
                       <td className="px-5 py-3 text-slate-600">{t.description || "—"}</td>
                       <td className="px-5 py-3 text-slate-600 text-right">{formatDate(t.createdAt, true)}</td>
                     </tr>
@@ -875,7 +879,7 @@ function PayoutsTab({ q }: { q: string }) {
                         <span>{p.advisor?.name || "—"}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 font-medium">{formatCurrency(p.amount)}</td>
+                    <td className="px-5 py-3 font-medium">{formatTransactionAmount(p)}</td>
                     <td className="px-5 py-3 text-slate-600 capitalize">{p.withdrawalMethod || "—"}</td>
                     <td className="px-5 py-3 text-slate-600">{formatDate(p.createdAt, true)}</td>
                     <td className="px-5 py-3 text-right">
@@ -1029,7 +1033,7 @@ function SummaryCard({
       <div className="mt-1 text-2xl font-bold text-slate-900">{value}</div>
       {note && <div className="mt-1 text-xs text-slate-400 truncate">{note}</div>}
       <div className="absolute right-3 bottom-2 w-24 opacity-70">
-        <MiniArea values={[2, 4, 3, 5, 7, 6, 8, 7, 9, 8]} color={color} height={40} />
+
       </div>
     </div>
   );

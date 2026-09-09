@@ -30,7 +30,7 @@ import { useBulkSelection } from "../../lib/use-bulk-selection";
 import { formatCompact, formatCurrency, formatDate } from "../../lib/format";
 import type { UserListItem } from "../../lib/types";
 import Link from "next/link";
-import { MiniArea } from "../../components/charts";
+import { formatCredits } from "../../lib/transaction-format";
 
 type ListResponse = {
   data: UserListItem[];
@@ -40,6 +40,7 @@ type ListResponse = {
     total: number;
     totalPages?: number;
     pendingBookings?: number;
+    totalRevenueUsd?: number;
   };
 };
 
@@ -108,11 +109,13 @@ export default function UsersListPage() {
     page: number;
     limit: number;
     pendingBookings: number;
+    totalRevenueUsd: number;
   }>({
     total: 0,
     page: 1,
     limit: 10,
     pendingBookings: 0,
+    totalRevenueUsd: 0,
   });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -130,7 +133,7 @@ export default function UsersListPage() {
 
   const bulk = useBulkSelection(items);
 
-  const totalRevenue = items.reduce((s, u) => s + (u.payments || 0), 0);
+  const totalRevenue = meta.totalRevenueUsd;
 
   const load = async () => {
     setLoading(true);
@@ -148,6 +151,7 @@ export default function UsersListPage() {
         page: r.meta?.page || page,
         limit: r.meta?.limit || limit,
         pendingBookings: r.meta?.pendingBookings || 0,
+        totalRevenueUsd: r.meta?.totalRevenueUsd || 0,
       });
       bulk.clear();
     } catch (err) {
@@ -317,7 +321,7 @@ export default function UsersListPage() {
             color="#60a5fa"
           />
           <SummaryCard
-            label="Total Revenue"
+            label="Total Cash Receipts (USD)"
             value={formatCurrency(totalRevenue)}
             icon={<DollarIcon />}
             iconBg="bg-rose-100 text-rose-600"
@@ -377,7 +381,7 @@ export default function UsersListPage() {
                     <th className="px-5 py-4 font-medium">User Mail</th>
                     <th className="px-5 py-4 font-medium">Joined</th>
                     <th className="px-5 py-4 font-medium">Sessions</th>
-                    <th className="px-5 py-4 font-medium">Payments</th>
+                    <th className="px-5 py-4 font-medium">Credits Spent</th>
                     <th className="px-5 py-4 font-medium">Plan</th>
                     <th className="px-5 py-4 font-medium text-right">Action</th>
                   </tr>
@@ -429,7 +433,7 @@ export default function UsersListPage() {
                             {u.sessionsCount || 0}
                           </td>
                           <td className="px-5 py-3 text-slate-700">
-                            {formatCurrency(u.payments)}
+                            {formatCredits(u.payments)}
                           </td>
                           <td className="px-5 py-3">
                             <PlanBadge
@@ -765,11 +769,7 @@ function SummaryCard({
       <div className="mt-3 text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-3xl font-bold text-slate-900">{value}</div>
       <div className="absolute right-3 bottom-2 w-32 opacity-80">
-        <MiniArea
-          values={[2, 4, 3, 5, 7, 6, 8, 7, 9, 8]}
-          color={color}
-          height={48}
-        />
+
       </div>
     </div>
   );

@@ -414,6 +414,10 @@ export interface Dispute {
 }
 
 export interface Transaction {
+  amountUsd?: number;
+  netProceedsUsd?: number;
+  displayAmount?: number;
+  displayUnit?: string;
   _id: string;
   txCode?: string;
   type: string;
@@ -559,7 +563,7 @@ export interface DashboardOverview {
   };
   newSubsByPlan?: Array<{ label: string; value: number }>;
   appointments?: { today: number; week: number; month: number };
-  refunds?: { today: number; week: number; month: number; year: number; amountYear: number };
+  refunds?: { today: number; week: number; month: number; year: number; amountYear: number; creditsYear?: number };
   serviceCategories?: Array<{ label: string; value: number; color?: string }>;
   advisorPerformance?: {
     total: number;
@@ -646,7 +650,23 @@ export interface PayoutAccountInfo {
   verified?: boolean;
 }
 
+export interface TipEarningsBreakdown {
+  grossUsd: number;
+  commissionUsd: number;
+  taxUsd: number;
+  deductionsUsd: number;
+  deductionPercent: number;
+  netUsd: number;
+  count: number;
+  storeTipCount: number;
+  appStoreCount: number;
+  playStoreCount: number;
+}
+
+export interface ServicePaymentWork { unpaidSeconds: number; unpaidSessions: number; pendingServiceUsd: number; paidServiceUsd: number }
+
 export interface PayoutAccountRow {
+  work: ServicePaymentWork;
   advisor: { _id: string; name: string; email?: string; profilePhoto?: string; country?: string };
   account: PayoutAccountInfo;
   availableCredits: number;
@@ -661,6 +681,7 @@ export interface PayoutAccountRow {
   totalEarnedCredits: number;
   totalTipEarnedUsd: number;
   totalTipWithdrawnUsd: number;
+  tipBreakdown: TipEarningsBreakdown;
 }
 
 export interface PayoutTransferMethod {
@@ -672,6 +693,7 @@ export interface PayoutTransferMethod {
 }
 
 export interface PayoutAccountDetails {
+  work: ServicePaymentWork;
   advisor: {
     _id: string;
     name: string;
@@ -696,12 +718,15 @@ export interface PayoutAccountDetails {
     totalWithdrawnCredits: number;
     totalTipEarnedUsd: number;
     totalTipWithdrawnUsd: number;
+    tipBreakdown: TipEarningsBreakdown;
   };
   config: PayoutConfig;
   recentPayouts: PayoutTransaction[];
 }
 
 export interface PayoutTransaction extends Transaction {
+  payoutServiceUsd?: number;
+  payoutSessionSeconds?: number;
   amountUsd?: number;
   payoutCredits?: number;
   payoutTipUsd?: number;
@@ -728,6 +753,7 @@ export interface PayoutStats {
   failed: PayoutStatAmount;
   rejected: PayoutStatAmount;
   payable: {
+    unpaidSeconds?: number;
     credits: number;
     tipUsd: number;
     usd: number;

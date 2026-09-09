@@ -13,7 +13,7 @@ export function BarChartSimple({
   formatValue?: (n: number) => string;
   showGrid?: boolean;
 }) {
-  const max = Math.max(1, ...data.map((d) => d.value));
+  const max = Math.max(5, Math.ceil(Math.max(0, ...data.map((d) => d.value)) / 5) * 5);
   const palette = [
     "#fbbf24",
     "#fbbf24",
@@ -23,7 +23,7 @@ export function BarChartSimple({
     "#f87171",
     "#22c55e",
   ];
-  const ticks = [0, 20, 40, 60, 80, 100];
+  const ticks = Array.from({ length: 6 }, (_, i) => (max * i) / 5);
 
   return (
     <div className="w-full flex" style={{ height }}>
@@ -51,7 +51,7 @@ export function BarChartSimple({
         >
           {data.map((d, i) => {
             const pct = (d.value / max) * 100;
-            const h = `${Math.max(6, pct)}%`;
+            const h = `${Math.max(0, pct)}%`;
             const color = d.color || palette[i % palette.length];
             return (
               <div
@@ -63,7 +63,7 @@ export function BarChartSimple({
                   style={{ height: h, background: color }}
                 >
                   <span className="text-[11px] font-semibold text-white drop-shadow">
-                    {formatValue ? formatValue(d.value) : `${Math.round(pct)}%`}
+                    {formatValue ? formatValue(d.value) : `${d.value}`}
                   </span>
                 </div>
                 <div className="absolute -bottom-5 text-[11px] text-slate-500">

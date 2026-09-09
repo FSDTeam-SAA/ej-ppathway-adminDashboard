@@ -1,4 +1,5 @@
 "use client";
+import { formatTransactionAmount } from "../../../lib/transaction-format";
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
@@ -493,34 +494,10 @@ function subscriptionPlanName(sub: NonNullable<UserDetailsResponse["subscription
   return sub.plan?.name || "Plan";
 }
 
-const CREDIT_TRANSACTION_TYPES = new Set([
-  "session_charge",
-  "session_refund",
-  "tip",
-  "unlock_recording",
-  "unlock_transcript",
-  "credit_expiration",
-  "free_credit_grant",
-  "advisor_earning",
-  "advisor_tip",
-  "advisor_payout",
-]);
-
-function formatTransactionAmount(
-  transaction: NonNullable<UserDetailsResponse["recentTransactions"]>[number],
-) {
-  if (CREDIT_TRANSACTION_TYPES.has(transaction.type)) {
-    return formatCredits(transaction.amount);
-  }
-  return formatCurrency(transaction.amount);
-}
-
 function formatSessionMinutes(transaction: NonNullable<UserDetailsResponse["recentTransactions"]>[number]) {
   const session = typeof transaction.session === "object" ? transaction.session : null;
-  const actualSeconds = Number(session?.actualDurationSec || 0);
-  if (actualSeconds > 0) return `${Math.ceil(actualSeconds / 60)} min`;
-  const bookedMinutes = Number(session?.durationMinutes || 0);
-  if (bookedMinutes > 0) return `${bookedMinutes} min`;
+  const seconds = session?.actualDurationSec;
+  if (typeof seconds === "number") return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   return "—";
 }
 
