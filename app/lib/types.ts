@@ -428,6 +428,11 @@ export interface Transaction {
   plan?: { _id?: string; name?: string } | string;
   amount: number;
   currency?: string;
+  metadata?: {
+    credits?: number | string;
+    totalCredits?: number | string;
+    [key: string]: unknown;
+  };
   provider?: string;
   withdrawalMethod?: string;
   description?: string;
