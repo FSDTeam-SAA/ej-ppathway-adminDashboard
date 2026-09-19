@@ -23,6 +23,17 @@ type CreditPack = {
   sortOrder?: number;
 };
 
+type TipPack = {
+  id: string;
+  label: string;
+  amountUsd: number;
+  revenueCatProductId?: string;
+  appleProductId?: string;
+  googleProductId?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
 type CreditUsageBlock = {
   id: string;
   activity: string;
@@ -38,6 +49,7 @@ type CreditSettings = {
   creditExpirationDays: number;
   creditUsdRate: number;
   creditPacks: CreditPack[];
+  tipPacks: TipPack[];
   creditUsage: {
     chatTranscript: number;
     videoRecording: number;
@@ -109,6 +121,13 @@ const DEFAULT_PACKS: CreditPack[] = [
   { id: "credits_100", label: "100 Credits", credits: 100, bonusCredits: 0, priceUsd: 59, revenueCatProductId: "credits_100", appleProductId: "credits_100", googleProductId: "credits_100", isActive: true, sortOrder: 2 },
 ];
 
+const DEFAULT_TIP_PACKS: TipPack[] = [
+  { id: "tip_5", label: "Advisor Tip 5 USD", amountUsd: 5, revenueCatProductId: "tip_5", appleProductId: "tip_5", googleProductId: "tip_5", isActive: true, sortOrder: 1 },
+  { id: "tip_10", label: "Advisor Tip 10 USD", amountUsd: 10, revenueCatProductId: "tip_10", appleProductId: "tip_10", googleProductId: "tip_10", isActive: true, sortOrder: 2 },
+  { id: "tip_20", label: "Advisor Tip 20 USD", amountUsd: 20, revenueCatProductId: "tip_20", appleProductId: "tip_20", googleProductId: "tip_20", isActive: true, sortOrder: 3 },
+  { id: "tip_50", label: "Advisor Tip 50 USD", amountUsd: 50, revenueCatProductId: "tip_50", appleProductId: "tip_50", googleProductId: "tip_50", isActive: true, sortOrder: 4 },
+];
+
 const DEFAULT_USAGE_BLOCKS: CreditUsageBlock[] = [
   { id: "chat_15", activity: "15-Minute Chat Session", sessionType: "chat", durationMinutes: 15, credits: 5, isActive: true, sortOrder: 1 },
   { id: "voice_5", activity: "5-Minute Voice Call", sessionType: "call", durationMinutes: 5, credits: 8, isActive: true, sortOrder: 2 },
@@ -130,7 +149,7 @@ export default function CreditManagementPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncingPackId, setSyncingPackId] = useState<string | null>(null);
-  const [pendingSyncPack, setPendingSyncPack] = useState<CreditPack | null>(null);
+  const [pendingSyncPack, setPendingSyncPack] = useState<CreditPack | TipPack | null>(null);
   const [storePriceSyncs, setStorePriceSyncs] = useState<StorePriceSyncJob[]>([]);
 
   const load = async () => {
@@ -187,6 +206,7 @@ export default function CreditManagementPage() {
         creditExpirationDays: settings.creditExpirationDays,
         creditUsdRate: settings.creditUsdRate,
         creditPacks: settings.creditPacks,
+        tipPacks: settings.tipPacks,
         creditUsageBlocks: settings.creditUsageBlocks,
       });
       setSettings(withDefaults(res.data));
@@ -200,9 +220,10 @@ export default function CreditManagementPage() {
     }
   };
 
-  const prepareStorePriceSync = (pack: CreditPack) => {
+  const prepareStorePriceSync = (pack: CreditPack | TipPack) => {
     if (!settings) return;
-    if (!Number.isFinite(pack.priceUsd) || pack.priceUsd <= 0) {
+    const price = "priceUsd" in pack ? pack.priceUsd : pack.amountUsd;
+    if (!Number.isFinite(price) || price <= 0) {
       toast.error("Store price must be greater than 0 USD");
       return;
     }
@@ -221,12 +242,13 @@ export default function CreditManagementPage() {
   const syncStorePrice = async () => {
     if (!settings || !pendingSyncPack) return;
     const pack = pendingSyncPack;
+    const price = "priceUsd" in pack ? pack.priceUsd : pack.amountUsd;
 
     setSyncingPackId(pack.id);
     try {
       const response = await api.post<StorePriceSyncJob>(
         `/admin/settings/credits/${encodeURIComponent(pack.id)}/store-price-sync`,
-        { targetPriceUsd: pack.priceUsd },
+        { targetPriceUsd: price },
       );
       if (!response.data) throw new Error("Store coordination returned no job");
       setStorePriceSyncs((current) => [response.data as StorePriceSyncJob, ...current.filter((item) => item._id !== response.data?._id)]);
@@ -256,6 +278,11 @@ export default function CreditManagementPage() {
     [settings?.creditPacks],
   );
 
+  const activeTipPacks = useMemo(
+    () => settings?.tipPacks.filter((pack) => pack.isActive !== false).length || 0,
+    [settings?.tipPacks],
+  );
+
   return (
     <>
       <Topbar />
@@ -270,7 +297,7 @@ export default function CreditManagementPage() {
           <Stat label="Credit sales" value={`$${num(summary?.totals.creditSalesRevenue).toLocaleString()}`} />
           <Stat label="Credits sold" value={num(summary?.totals.creditsSold).toLocaleString()} />
           <Stat label="Outstanding credits" value={num((summary?.totals.purchasedBalance || 0) + (summary?.totals.freeBalance || 0)).toLocaleString()} />
-          <Stat label="Active packs" value={String(activePacks)} />
+          <Stat label="Active packs" value={`${activePacks} packs / ${activeTipPacks} tips`} />
         </div>
 
         {loading || !settings ? (
@@ -344,6 +371,58 @@ export default function CreditManagementPage() {
                     </label>
                     <div className="flex items-end">
                       <Button variant="outline" onClick={() => setSettings({ ...settings, creditPacks: settings.creditPacks.filter((_, i) => i !== index) })}>
+                        Delete
+                      </Button>
+                    </div>
+                    <div className="md:col-span-2 xl:col-span-4 flex flex-col items-start gap-2 border-t border-slate-100 pt-3">
+                      <Button
+                        variant="success"
+                        onClick={() => prepareStorePriceSync(pack)}
+                        loading={syncingPackId === pack.id}
+                        disabled={syncingPackId !== null || pack.isActive === false || storePriceSyncs.some((sync) => sync.packId === pack.id && sync.active)}
+                      >
+                        Start Coordinated Update
+                      </Button>
+                      {storePriceSyncs.find((sync) => sync.packId === pack.id) ? (
+                        <StoreSyncProgress
+                          sync={storePriceSyncs.find((sync) => sync.packId === pack.id) as StorePriceSyncJob}
+                          onCheckNow={checkStorePriceNow}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Advisor Tip Packages</h2>
+                  <p className="text-sm text-slate-500">Configure client-facing tip tiers and map each tip to Apple and Google store products.</p>
+                </div>
+                <Button variant="outline" onClick={() => setSettings({ ...settings, tipPacks: [...settings.tipPacks, newTipPack(settings.tipPacks.length)] })}>
+                  Add Tip Package
+                </Button>
+              </div>
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Enter an Apple-supported USD price point, then start a coordinated update. Apple is monitored first; Google updates only after Apple’s US price is confirmed.
+              </div>
+              <div className="space-y-3">
+                {settings.tipPacks.map((pack, index) => (
+                  <div key={`${pack.id}-${index}`} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 rounded-lg border border-slate-100 p-3">
+                    <Input label="ID" value={pack.id} onChange={(e) => patchTipPack(settings, setSettings, index, { id: e.target.value })} />
+                    <Input label="Label" value={pack.label} onChange={(e) => patchTipPack(settings, setSettings, index, { label: e.target.value })} />
+                    <Input label="Amount (USD)" type="number" min={0.01} step={0.01} value={String(pack.amountUsd)} onChange={(e) => patchTipPack(settings, setSettings, index, { amountUsd: Number(e.target.value) })} />
+                    <Input label="RevenueCat fallback ID" value={pack.revenueCatProductId || ""} onChange={(e) => patchTipPack(settings, setSettings, index, { revenueCatProductId: e.target.value })} />
+                    <Input label="Apple product ID" value={pack.appleProductId || ""} onChange={(e) => patchTipPack(settings, setSettings, index, { appleProductId: e.target.value })} />
+                    <Input label="Google product ID" value={pack.googleProductId || ""} onChange={(e) => patchTipPack(settings, setSettings, index, { googleProductId: e.target.value })} />
+                    <label className="flex items-end gap-2 text-sm text-slate-700 pb-2">
+                      <input type="checkbox" checked={pack.isActive !== false} onChange={(e) => patchTipPack(settings, setSettings, index, { isActive: e.target.checked })} />
+                      Active
+                    </label>
+                    <div className="flex items-end">
+                      <Button variant="outline" onClick={() => setSettings({ ...settings, tipPacks: settings.tipPacks.filter((_, i) => i !== index) })}>
                         Delete
                       </Button>
                     </div>
@@ -539,11 +618,12 @@ function StorePriceSyncDialog({
   onClose,
   onConfirm,
 }: {
-  pack: CreditPack | null;
+  pack: CreditPack | TipPack | null;
   loading: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const price = pack ? ("priceUsd" in pack ? pack.priceUsd : pack.amountUsd) : 0;
   return (
     <Modal open={Boolean(pack)} onClose={onClose} hideClose size="sm">
       {pack ? (
@@ -566,7 +646,7 @@ function StorePriceSyncDialog({
 
           <div className="my-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">New base price</p>
-            <p className="mt-1 text-4xl font-bold tracking-tight text-slate-950">${pack.priceUsd.toFixed(2)}</p>
+            <p className="mt-1 text-4xl font-bold tracking-tight text-slate-950">${price.toFixed(2)}</p>
             <p className="mt-1 text-xs text-slate-500">USD · localized prices may vary by region</p>
           </div>
 
@@ -607,6 +687,7 @@ function StoreTarget({ label, productId, tone }: { label: string; productId: str
 
 function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
   const creditPacks = Array.isArray(data?.creditPacks) ? data.creditPacks : DEFAULT_PACKS;
+  const tipPacks = Array.isArray(data?.tipPacks) ? data.tipPacks : DEFAULT_TIP_PACKS;
   const usageBlocks = Array.isArray(data?.creditUsageBlocks) ? data.creditUsageBlocks : DEFAULT_USAGE_BLOCKS;
   return {
     signupFreeCredits: Number(data?.signupFreeCredits ?? 0),
@@ -618,6 +699,16 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
       credits: Number(pack.credits || 0),
       bonusCredits: Number(pack.bonusCredits || 0),
       priceUsd: Number(pack.priceUsd || 0),
+      revenueCatProductId: pack.revenueCatProductId || pack.id || "",
+      appleProductId: pack.appleProductId || pack.revenueCatProductId || pack.id || "",
+      googleProductId: pack.googleProductId || pack.revenueCatProductId || pack.id || "",
+      isActive: pack.isActive !== false,
+      sortOrder: Number(pack.sortOrder ?? index + 1),
+    })),
+    tipPacks: tipPacks.map((pack, index) => ({
+      id: pack.id || `tip_${index + 1}`,
+      label: pack.label || `Advisor Tip ${pack.amountUsd || 0} USD`,
+      amountUsd: Number(pack.amountUsd || 0),
       revenueCatProductId: pack.revenueCatProductId || pack.id || "",
       appleProductId: pack.appleProductId || pack.revenueCatProductId || pack.id || "",
       googleProductId: pack.googleProductId || pack.revenueCatProductId || pack.id || "",
@@ -646,12 +737,20 @@ function patchPack(settings: CreditSettings, setSettings: (next: CreditSettings)
   setSettings({ ...settings, creditPacks: settings.creditPacks.map((pack, i) => i === index ? { ...pack, ...patch } : pack) });
 }
 
+function patchTipPack(settings: CreditSettings, setSettings: (next: CreditSettings) => void, index: number, patch: Partial<TipPack>) {
+  setSettings({ ...settings, tipPacks: settings.tipPacks.map((pack, i) => i === index ? { ...pack, ...patch } : pack) });
+}
+
 function patchBlock(settings: CreditSettings, setSettings: (next: CreditSettings) => void, index: number, patch: Partial<CreditUsageBlock>) {
   setSettings({ ...settings, creditUsageBlocks: settings.creditUsageBlocks.map((block, i) => i === index ? { ...block, ...patch } : block) });
 }
 
 function newPack(index: number): CreditPack {
   return { id: `credits_${Date.now()}`, label: "New Credit Pack", credits: 25, bonusCredits: 0, priceUsd: 19, revenueCatProductId: "", appleProductId: "", googleProductId: "", isActive: true, sortOrder: index + 1 };
+}
+
+function newTipPack(index: number): TipPack {
+  return { id: `tip_${Date.now()}`, label: "New Advisor Tip", amountUsd: 15, revenueCatProductId: "", appleProductId: "", googleProductId: "", isActive: true, sortOrder: index + 1 };
 }
 
 function newUsageBlock(index: number): CreditUsageBlock {
@@ -676,6 +775,24 @@ function validate(settings: CreditSettings) {
   if (new Set(appleIds).size !== appleIds.length) return "Apple product IDs must be unique";
   const googleIds = settings.creditPacks.map((pack) => pack.googleProductId?.trim()).filter(Boolean);
   if (new Set(googleIds).size !== googleIds.length) return "Google product IDs must be unique";
+
+  if (settings.tipPacks?.length) {
+    for (const tip of settings.tipPacks) {
+      if (!tip.id.trim() || !tip.label.trim() || tip.amountUsd <= 0) {
+        return "Each tip package needs ID, label, and positive amount USD";
+      }
+      if (tip.isActive !== false && (!tip.appleProductId?.trim() || !tip.googleProductId?.trim())) {
+        return "Each active tip package needs both Apple and Google product IDs";
+      }
+    }
+    const tipIds = settings.tipPacks.map((t) => t.id.trim());
+    if (new Set(tipIds).size !== tipIds.length) return "Tip package IDs must be unique";
+    const tipAppleIds = settings.tipPacks.map((t) => t.appleProductId?.trim()).filter(Boolean);
+    if (new Set(tipAppleIds).size !== tipAppleIds.length) return "Apple product IDs for tips must be unique";
+    const tipGoogleIds = settings.tipPacks.map((t) => t.googleProductId?.trim()).filter(Boolean);
+    if (new Set(tipGoogleIds).size !== tipGoogleIds.length) return "Google product IDs for tips must be unique";
+  }
+
   if (!settings.creditUsageBlocks.length) return "Add at least one usage block";
   for (const block of settings.creditUsageBlocks) {
     if (!block.id.trim() || !block.activity.trim() || block.durationMinutes < 0 || block.credits < 0) {
