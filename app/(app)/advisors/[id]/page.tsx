@@ -135,6 +135,19 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const removeMedia = async (field: "profilePhoto" | "audioMessageUrl" | "introVideoUrl") => {
+    setActionLoading(true);
+    try {
+      await api.patch(`/admin/advisors/${id}`, { [field]: "" });
+      toast.success("Media removed");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not remove media");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const openChat = async () => {
     if (!u?._id) return;
     setChatLoading(true);
@@ -181,6 +194,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               <div className="flex flex-col md:flex-row md:items-center gap-5">
                 <div className="relative">
                   <Avatar src={u.profilePhoto} name={u.name} size={96} />
+                  {u.profilePhoto && <Button variant="outline" size="sm" disabled={actionLoading} onClick={() => removeMedia("profilePhoto")}>Remove Photo</Button>}
                   <span
                     className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-white ${
                       m?.availability.isOnline ? "bg-emerald-500" : "bg-slate-300"
@@ -275,7 +289,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
               <div className="mt-6">
                 <div className="text-sm font-medium text-slate-500 mb-1.5">Bio / About the Advisor</div>
                 <p className="text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-4">
-                  {p?.detailedDescription || p?.bio || "No bio provided."}
+                  {p?.bio || p?.detailedDescription || "No bio provided."}
                 </p>
               </div>
 
@@ -289,6 +303,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                           Audio Message
                         </div>
                         <audio src={p.audioMessageUrl} controls className="w-full" />
+                        <Button variant="outline" size="sm" disabled={actionLoading} onClick={() => removeMedia("audioMessageUrl")}>Remove Audio Message</Button>
                       </div>
                     )}
                     {p?.introVideoUrl && (
@@ -296,6 +311,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
                         <div className="mb-3 text-sm font-semibold text-slate-700">
                           Intro Video
                         </div>
+                        <Button variant="outline" size="sm" disabled={actionLoading} onClick={() => removeMedia("introVideoUrl")}>{isAudioMediaUrl(p.introVideoUrl) ? "Remove Audio Message" : "Remove Intro Video"}</Button>
                         {isAudioMediaUrl(p.introVideoUrl) ? (
                           <audio src={p.introVideoUrl} controls className="w-full" />
                         ) : (
@@ -1906,7 +1922,7 @@ function EditAdvisorModal({
     expertise: (profile?.expertise || []).join(", "),
     styles: (profile?.styles || []).join(", "),
     languages: (profile?.languages || []).join(", "),
-    bio: profile?.bio || "",
+    bio: profile?.bio || profile?.detailedDescription || "",
     detailedDescription: profile?.detailedDescription || "",
     isOnline: !!profile?.isOnline,
     autoOnlineMode: !!profile?.autoOnlineMode,
@@ -2132,10 +2148,10 @@ function EditAdvisorModal({
 
       <div className="mt-4">
         <Textarea
-          label="Bio / About the Advisor"
-          value={form.detailedDescription}
-          onChange={(e) => onChange("detailedDescription", e.target.value)}
-          placeholder="Detailed description..."
+          label="Brief Bio"
+          value={form.bio}
+          onChange={(e) => onChange("bio", e.target.value)}
+          placeholder="Brief bio..."
         />
       </div>
 
