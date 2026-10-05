@@ -414,6 +414,8 @@ export interface Dispute {
 }
 
 export interface Transaction {
+  tipBreakdown?: { grossUsd: number; netUsd: number; deductionsUsd: number; commissionUsd: number; taxUsd: number };
+  linkedAdvisorTransaction?: { _id: string; txCode?: string };
   amountUsd?: number;
   netProceedsUsd?: number;
   displayAmount?: number;

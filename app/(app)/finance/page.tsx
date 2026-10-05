@@ -295,7 +295,7 @@ function TransactionsTab({
   useEffect(() => {
     setLoading(true);
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit, q: q || undefined })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, q: q || undefined, groupTips: "true" })
       .then((r) => {
         const loaded = r.data || [];
         setItems(loaded);
@@ -349,7 +349,7 @@ function TransactionsTab({
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (
-          <TableSkeleton rows={8} cols={7} />
+          <TableSkeleton rows={8} cols={8} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -366,15 +366,16 @@ function TransactionsTab({
                   <th className="px-5 py-4 font-medium">User</th>
                   <th className="px-5 py-4 font-medium">Transaction ID</th>
                   <th className="px-5 py-4 font-medium">Type</th>
-                  <th className="px-5 py-4 font-medium">Credits</th>
+                  <th className="px-5 py-4 font-medium">Amount</th>
                   <th className="px-5 py-4 font-medium">Date & Time</th>
-                  <th className="px-5 py-4 font-medium text-right">Status</th>
+                  <th className="px-5 py-4 font-medium">Status</th>
+                  <th className="px-5 py-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-10 text-slate-500">
+                    <td colSpan={8} className="text-center py-10 text-slate-500">
                       No transactions
                     </td>
                   </tr>
@@ -407,13 +408,21 @@ function TransactionsTab({
                         <td className="px-5 py-3 font-medium text-slate-900">
                           {t.txCode || `TXN-${t._id.slice(-4).toUpperCase()}`}
                         </td>
-                        <td className="px-5 py-3 capitalize">{t.type.replace(/_/g, " ")}</td>
+                        <td className="px-5 py-3 capitalize">{t.type === "tip_fiat" ? "Tip Payment" : t.type === "advisor_tip_fiat" ? "Advisor Tip Earnings" : t.type.replace(/_/g, " ")}</td>
                         <td className="px-5 py-3">
                           <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
                             {formatTransactionAmount(t)}
+                            {t.type === "tip_fiat" && " paid"}
                           </span>
+                          {t.type === "tip_fiat" && t.tipBreakdown && (
+                            <div className="mt-1 text-xs text-slate-500">
+                              Advisor earnings: {formatCurrency(t.tipBreakdown.netUsd)} USD
+                              <br />Store deductions: {formatCurrency(t.tipBreakdown.deductionsUsd)} USD
+                            </div>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-slate-600">{formatDate(t.createdAt, true)}</td>
+                        <td className="px-5 py-3"><StatusBadge status={t.status} /></td>
                         <td className="px-5 py-3 text-right">
                           <button
                             type="button"
@@ -459,6 +468,15 @@ function TransactionsTab({
                 value={formatTransactionAmount(details)}
                 tone={details.amount < 0 ? "danger" : "success"}
               />
+              {details.type === "tip_fiat" && details.tipBreakdown && (
+                <div className="space-y-3 rounded-lg bg-slate-50 p-3">
+                  <DetailRow label="Tip paid (USD)" value={formatCurrency(details.tipBreakdown.grossUsd)} />
+                  <DetailRow label="Store deductions (USD)" value={formatCurrency(details.tipBreakdown.deductionsUsd)} />
+                  <DetailRow label="Advisor net earnings (USD)" value={formatCurrency(details.tipBreakdown.netUsd)} />
+                  {details.linkedAdvisorTransaction && <DetailRow label="Linked advisor entry" value={details.linkedAdvisorTransaction.txCode || details.linkedAdvisorTransaction._id} mono />}
+                  <p className="text-xs text-slate-600">One tip payment. Advisor earnings are allocated from this payment; no additional charge.</p>
+                </div>
+              )}
               <DetailRow label="Payment Method" value={details.provider || "—"} capitalize />
               <DetailRow label="Date" value={formatDate(details.createdAt, true)} />
               {details.user && <DetailRow label="User" value={`${details.user.name} (${details.user.email})`} />}
