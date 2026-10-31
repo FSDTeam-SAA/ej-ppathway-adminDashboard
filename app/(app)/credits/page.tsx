@@ -16,6 +16,7 @@ type CreditPack = {
   bonusCredits?: number;
   totalCredits?: number;
   priceUsd: number;
+  flutterwavePriceNgn?: number;
   revenueCatProductId?: string;
   appleProductId?: string;
   googleProductId?: string;
@@ -74,6 +75,8 @@ type CreditSummary = {
     creditSalesRevenue: number;
     creditPurchaseCount: number;
     creditsSold: number;
+    creditRefundsUsd?: number;
+    creditsRefunded?: number;
     expiredCredits: number;
     expiredCount: number;
   };
@@ -302,6 +305,7 @@ export default function CreditManagementPage() {
           <Stat label="Outstanding credits" value={num((summary?.totals.purchasedBalance || 0) + (summary?.totals.freeBalance || 0)).toLocaleString()} />
           <Stat label="Active packs" value={`${activePacks} packs / ${activeTipPacks} tips`} />
         </div>
+        <p className="mb-6 text-sm text-slate-500">Gross sales above. Cash refunds: ${num(summary?.totals.creditRefundsUsd).toLocaleString()}; credits reversed: {num(summary?.totals.creditsRefunded).toLocaleString()}.</p>
 
         {loading || !settings ? (
           <div className="h-96 rounded-xl bg-white border border-slate-100 animate-pulse" />
@@ -366,6 +370,8 @@ export default function CreditManagementPage() {
                     <Input label="Label" value={pack.label} onChange={(e) => patchPack(settings, setSettings, index, { label: e.target.value })} />
                     <Input label="Credits" type="number" min={1} value={String(pack.credits)} onChange={(e) => patchPack(settings, setSettings, index, { credits: Number(e.target.value) })} />
                     <Input label="Reference USD" type="number" min={0} step={0.01} value={String(pack.priceUsd)} onChange={(e) => patchPack(settings, setSettings, index, { priceUsd: Number(e.target.value) })} />
+                    <Input label="Flutterwave price (NGN)" type="number" min={0} step={0.01} value={String(pack.flutterwavePriceNgn || 0)} onChange={(e) => patchPack(settings, setSettings, index, { flutterwavePriceNgn: Number(e.target.value) })} />
+                    <p className="self-center text-xs text-slate-500">Set the Naira checkout price, then Save Changes. Zero hides this pack from Flutterwave. Store prices are managed separately.</p>
                     <Input label="RevenueCat fallback ID" value={pack.revenueCatProductId || ""} disabled={identityLocked} title={identityLocked ? "RevenueCat product mapping is locked after the pack is saved" : undefined} onChange={(e) => patchPack(settings, setSettings, index, { revenueCatProductId: e.target.value })} />
                     <Input label="Apple product ID" value={pack.appleProductId || ""} disabled={identityLocked} title={identityLocked ? "Apple product mapping is locked after the pack is saved" : undefined} onChange={(e) => patchPack(settings, setSettings, index, { appleProductId: e.target.value })} />
                     <Input label="Google product ID" value={pack.googleProductId || ""} disabled={identityLocked} title={identityLocked ? "Google product mapping is locked after the pack is saved" : undefined} onChange={(e) => patchPack(settings, setSettings, index, { googleProductId: e.target.value })} />
@@ -707,8 +713,9 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
       id: pack.id || `credits_${index + 1}`,
       label: pack.label || `${pack.credits || 0} Credits`,
       credits: Number(pack.credits || 0),
-      bonusCredits: 0,
+      bonusCredits: Number(pack.bonusCredits || 0),
       priceUsd: Number(pack.priceUsd || 0),
+      flutterwavePriceNgn: Number(pack.flutterwavePriceNgn || 0),
       revenueCatProductId: pack.revenueCatProductId || pack.id || "",
       appleProductId: pack.appleProductId || pack.revenueCatProductId || pack.id || "",
       googleProductId: pack.googleProductId || pack.revenueCatProductId || pack.id || "",
@@ -770,7 +777,7 @@ function omitDraftFlag<T extends { isDraft?: boolean }>(item: T): Omit<T, "isDra
 }
 
 function toCreditPackPayload(pack: CreditPack): Omit<CreditPack, "isDraft"> {
-  return { ...omitDraftFlag(pack), bonusCredits: 0 };
+  return omitDraftFlag(pack);
 }
 
 function newUsageBlock(index: number): CreditUsageBlock {
@@ -782,6 +789,10 @@ function validate(settings: CreditSettings) {
   if (!Number.isFinite(settings.creditExpirationDays) || settings.creditExpirationDays <= 0) return "Credit expiration days must be greater than 0";
   if (!settings.creditPacks.length) return "Add at least one credit pack";
   for (const pack of settings.creditPacks) {
+    const ngn = Number(pack.flutterwavePriceNgn ?? 0);
+    if (!Number.isFinite(ngn) || ngn < 0 || !Number.isSafeInteger(Math.round(ngn * 100)) || Math.abs(ngn * 100 - Math.round(ngn * 100)) > 0.00001) {
+      return "Flutterwave price must be non-negative NGN with at most two decimal places";
+    }
     if (!pack.id.trim() || !pack.label.trim() || pack.credits <= 0 || pack.priceUsd < 0) {
       return "Each pack needs ID, label, positive credits, and non-negative price";
     }

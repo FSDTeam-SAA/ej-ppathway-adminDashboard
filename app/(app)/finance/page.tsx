@@ -381,7 +381,7 @@ function TransactionsTab({
                   </tr>
                 ) : (
                   items.map((t) => {
-                    const isPositive = !["advisor_payout", "session_refund", "subscription_refund"].includes(t.type);
+                    const isPositive = !["advisor_payout", "session_refund", "subscription_refund", "credit_pack_refund"].includes(t.type);
                     const selected = bulk.isSelected(t._id);
                     return (
                       <tr
@@ -478,6 +478,13 @@ function TransactionsTab({
                 </div>
               )}
               <DetailRow label="Payment Method" value={details.provider || "—"} capitalize />
+              {details.provider === "flutterwave" && <>
+                {details.flutterwaveReference && <DetailRow label="Payment reference" value={details.flutterwaveReference} mono />}
+                {details.flutterwaveTransactionId && <DetailRow label="Flutterwave transaction" value={details.flutterwaveTransactionId} mono />}
+                {details.flutterwaveRefundId && <DetailRow label="Flutterwave refund" value={details.flutterwaveRefundId} mono />}
+                <DetailRow label="Credits" value={String(details.metadata?.totalCredits ?? "—")} />
+                <DetailRow label="Reporting amount (USD)" value={formatCurrency(details.amountUsd || 0)} />
+              </>}
               <DetailRow label="Date" value={formatDate(details.createdAt, true)} />
               {details.user && <DetailRow label="User" value={`${details.user.name} (${details.user.email})`} />}
               {details.advisor && <DetailRow label="Advisor" value={`${details.advisor.name} (${details.advisor.email})`} />}
@@ -603,7 +610,7 @@ function RefundsTab({ q }: { q: string }) {
     setLoading(true);
     // session refunds first; admins can review chargebacks/disputes in Compliance.
     api
-      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "session_refund", q: q || undefined })
+      .get<Transaction[]>("/admin/finance/transactions", { page, limit, type: "session_refund,subscription_refund,credit_pack_refund", q: q || undefined })
       .then((r) => {
         setItems(r.data || []);
         setTotal(r.meta?.total || 0);
@@ -616,7 +623,7 @@ function RefundsTab({ q }: { q: string }) {
   return (
     <div>
       <div className="flex justify-end mb-3">
-        <ExportButton report="transactions" query={{ type: "session_refund" }} />
+        <ExportButton report="transactions" query={{ type: "session_refund,subscription_refund,credit_pack_refund" }} />
       </div>
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {loading ? (

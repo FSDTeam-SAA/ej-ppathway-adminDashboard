@@ -436,6 +436,9 @@ export interface Transaction {
     [key: string]: unknown;
   };
   provider?: string;
+  flutterwaveReference?: string;
+  flutterwaveTransactionId?: string;
+  flutterwaveRefundId?: string;
   withdrawalMethod?: string;
   description?: string;
   withdrawalStatus?: "requested" | "approved" | "processing" | "paid" | "failed" | "rejected";
