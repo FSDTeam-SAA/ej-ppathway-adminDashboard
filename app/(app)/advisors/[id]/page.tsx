@@ -365,6 +365,7 @@ export default function AdvisorDetailsPage({ params }: { params: Promise<{ id: s
             {/* ===== Availability ===== */}
             <Section title="Availability">
               <AdminAvailabilityCalendar
+                timezone={u.timezone || "UTC"}
                 advisorId={id}
                 profile={p}
                 metrics={m}
@@ -597,11 +598,13 @@ type RequiredSlot = { from: string; to: string };
 type DateAvailabilityRule = { unavailable?: boolean; slots?: RequiredSlot[] };
 
 function AdminAvailabilityCalendar({
+  timezone,
   advisorId,
   profile,
   metrics,
   onSaved,
 }: {
+  timezone: string;
   advisorId: string;
   profile?: AdvisorProfile | null;
   metrics?: AdvisorMetrics;
@@ -659,11 +662,13 @@ function AdminAvailabilityCalendar({
     return baseSlots.filter((slot) => !available.has(slotKey(slot))).map(slotKey);
   };
   const isTimeOffSlotEditable = (key: string, slot: RequiredSlot) => {
-    const today = dateKey(new Date());
+    const zone = timezone;
+    const today = calendarDateInZone(new Date(), zone);
     if (key > today) return true;
     if (key < today) return false;
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const p = new Intl.DateTimeFormat("en", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+    const currentMinutes = Number(p.find(part => part.type === "hour")?.value) * 60 + Number(p.find(part => part.type === "minute")?.value);
     return toMinutes(slot.from) > currentMinutes;
   };
 
@@ -687,7 +692,7 @@ function AdminAvailabilityCalendar({
       return dateKey(date);
     });
   }, [selectedDate]);
-  const todayKey = dateKey(new Date());
+  const todayKey = calendarDateInZone(new Date(), timezone);
   const editableWeekDates = selectedWeekDates.filter((key) => key >= todayKey);
   const fullEditableWeekHasOverrides =
     editableWeekDates.length > 0 && editableWeekDates.every((key) => hasDateOverride(key));
@@ -1705,6 +1710,12 @@ function dateKey(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+function calendarDateInZone(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const value = (type: string) => parts.find(p => p.type === type)?.value;
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
 function parseDateKey(key: string) {
   const [year, month, day] = key.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -1927,10 +1938,12 @@ function EditAdvisorModal({
     isOnline: !!profile?.isOnline,
     autoOnlineMode: !!profile?.autoOnlineMode,
     weeklySchedule: defaultWeeklySchedule(profile),
+    dateAvailability: profile?.dateAvailability || {},
   });
   const [form, setForm] = useState(buildInitialForm);
   const cities = useCities(form.country);
   const [loading, setLoading] = useState(false);
+  const [convertingTimezone, setConvertingTimezone] = useState(false);
 
   useEffect(() => {
     if (open) setForm(buildInitialForm());
@@ -1956,6 +1969,7 @@ function EditAdvisorModal({
   };
 
   const submit = async () => {
+    if (convertingTimezone) return;
     setLoading(true);
     try {
       await api.patch(`/admin/advisors/${advisorId}`, {
@@ -1965,6 +1979,8 @@ function EditAdvisorModal({
         state: form.state,
         city: form.city,
         timezone: form.timezone,
+        availabilityTimezone: form.timezone,
+        dateAvailability: form.dateAvailability,
         professionalTitle: form.professionalTitle,
         tier: form.tier,
         expertise: form.expertise,
@@ -1984,6 +2000,22 @@ function EditAdvisorModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const changeTimezone = async (timezone: string) => {
+    if (timezone === form.timezone || convertingTimezone || loading) return;
+    setConvertingTimezone(true);
+    try {
+      const res = await api.post<{ weeklySchedule: WeeklyScheduleForm; dateAvailability: Record<string, AdvisorDateAvailability> }>(
+        `/admin/advisors/${advisorId}/availability-timezone-preview`, {
+          fromTimezone: form.timezone || "UTC", toTimezone: timezone,
+          weeklySchedule: form.weeklySchedule, dateAvailability: form.dateAvailability,
+        });
+      if (!res.data) throw new Error("Timezone conversion was unavailable");
+      setForm(current => ({ ...current, timezone, weeklySchedule: res.data!.weeklySchedule, dateAvailability: res.data!.dateAvailability }));
+      toast.success("Times converted. Save to apply the new timezone.");
+    } catch (err) { toast.error(err instanceof Error ? err.message : "Could not convert availability"); }
+    finally { setConvertingTimezone(false); }
   };
 
   return (
@@ -2029,11 +2061,13 @@ function EditAdvisorModal({
           <Combobox
             options={timezoneOptions}
             value={form.timezone}
-            onChange={(v) => onChange("timezone", v)}
+            onChange={(v) => void changeTimezone(v)}
+            disabled={convertingTimezone || loading}
             placeholder="Select timezone..."
             searchPlaceholder="Search timezones..."
             emptyText="No timezone found."
           />
+          <p className="mt-1 text-xs text-slate-500">{convertingTimezone ? "Converting availability…" : "Changing timezone converts availability. Existing appointments keep their scheduled instant."}</p>
         </label>
         <Input
           label="Professional Title"
@@ -2159,7 +2193,7 @@ function EditAdvisorModal({
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={submit} loading={loading}>
+        <Button onClick={submit} loading={loading} disabled={convertingTimezone}>
           Save Changes
         </Button>
       </div>
