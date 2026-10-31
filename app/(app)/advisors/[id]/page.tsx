@@ -613,19 +613,27 @@ function AdminAvailabilityCalendar({
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [availability, setAvailability] = useState(() => normalizeAvailabilityProfile(profile));
-  const [viewMonth, setViewMonth] = useState(() => monthStart(new Date()));
-  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
+  const [viewMonth, setViewMonth] = useState(() => monthStart(parseDateKey(calendarDateInZone(new Date(), timezone))));
+  const [selectedDate, setSelectedDate] = useState(() => calendarDateInZone(new Date(), timezone));
   const [applyModalOpen, setApplyModalOpen] = useState(false);
-  const [applyDate, setApplyDate] = useState(() => dateKey(new Date()));
+  const [applyDate, setApplyDate] = useState(() => calendarDateInZone(new Date(), timezone));
   const [applySlotKeys, setApplySlotKeys] = useState<string[]>([]);
   const [timeOffModalOpen, setTimeOffModalOpen] = useState(false);
-  const [timeOffDate, setTimeOffDate] = useState(() => dateKey(new Date()));
+  const [timeOffDate, setTimeOffDate] = useState(() => calendarDateInZone(new Date(), timezone));
   const [timeOffSlotKeys, setTimeOffSlotKeys] = useState<string[]>([]);
   const [timeOffFullDay, setTimeOffFullDay] = useState(false);
 
   useEffect(() => {
     setAvailability(normalizeAvailabilityProfile(profile));
   }, [profile?._id, profile?.updatedAt]);
+
+  useEffect(() => {
+    const today = calendarDateInZone(new Date(), timezone);
+    setSelectedDate(today);
+    setApplyDate(today);
+    setTimeOffDate(today);
+    setViewMonth(monthStart(parseDateKey(today)));
+  }, [timezone]);
 
   const dateAvailability = availability.dateAvailability || {};
   const hasDateOverride = (key: string) => Object.prototype.hasOwnProperty.call(dateAvailability, key);
