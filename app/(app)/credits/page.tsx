@@ -29,6 +29,7 @@ type TipPack = {
   id: string;
   label: string;
   amountUsd: number;
+  flutterwavePriceNgn?: number;
   revenueCatProductId?: string;
   appleProductId?: string;
   googleProductId?: string;
@@ -411,7 +412,7 @@ export default function CreditManagementPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Advisor Tip Packages</h2>
-                  <p className="text-sm text-slate-500">Configure client-facing tip tiers and map each tip to Apple and Google store products.</p>
+                  <p className="text-sm text-slate-500">Set tip prices for Apple/Google IAP and Flutterwave payments in Nigerian Naira.</p>
                 </div>
                 <Button variant="outline" onClick={() => setSettings({ ...settings, tipPacks: [...settings.tipPacks, newTipPack(settings.tipPacks.length)] })}>
                   Add Tip Package
@@ -428,6 +429,8 @@ export default function CreditManagementPage() {
                     <Input label="ID" value={pack.id} disabled={identityLocked} title={identityLocked ? "ID is locked after the tip package is saved" : undefined} onChange={(e) => patchTipPack(settings, setSettings, index, { id: e.target.value })} />
                     <Input label="Label" value={pack.label} onChange={(e) => patchTipPack(settings, setSettings, index, { label: e.target.value })} />
                     <Input label="Amount (USD)" type="number" min={0.01} step={0.01} value={String(pack.amountUsd)} onChange={(e) => patchTipPack(settings, setSettings, index, { amountUsd: Number(e.target.value) })} />
+                    <Input label="Flutterwave price (NGN)" type="number" min={0} step={0.01} value={String(pack.flutterwavePriceNgn ?? 0)} onChange={(e) => patchTipPack(settings, setSettings, index, { flutterwavePriceNgn: Number(e.target.value) })} />
+                    <p className="self-center text-xs text-slate-500">Set the Naira tip price, then Save Changes. Zero hides this tip from Flutterwave. Apple/Google prices are managed separately.</p>
                     <Input label="RevenueCat fallback ID" value={pack.revenueCatProductId || ""} disabled={identityLocked} title={identityLocked ? "RevenueCat product mapping is locked after the tip package is saved" : undefined} onChange={(e) => patchTipPack(settings, setSettings, index, { revenueCatProductId: e.target.value })} />
                     <Input label="Apple product ID" value={pack.appleProductId || ""} disabled={identityLocked} title={identityLocked ? "Apple product mapping is locked after the tip package is saved" : undefined} onChange={(e) => patchTipPack(settings, setSettings, index, { appleProductId: e.target.value })} />
                     <Input label="Google product ID" value={pack.googleProductId || ""} disabled={identityLocked} title={identityLocked ? "Google product mapping is locked after the tip package is saved" : undefined} onChange={(e) => patchTipPack(settings, setSettings, index, { googleProductId: e.target.value })} />
@@ -726,6 +729,7 @@ function withDefaults(data?: Partial<CreditSettings> | null): CreditSettings {
       id: pack.id || `tip_${index + 1}`,
       label: pack.label || `Advisor Tip ${pack.amountUsd || 0} USD`,
       amountUsd: Number(pack.amountUsd || 0),
+      flutterwavePriceNgn: Number(pack.flutterwavePriceNgn ?? 0),
       revenueCatProductId: pack.revenueCatProductId || pack.id || "",
       appleProductId: pack.appleProductId || pack.revenueCatProductId || pack.id || "",
       googleProductId: pack.googleProductId || pack.revenueCatProductId || pack.id || "",
@@ -767,7 +771,7 @@ function newPack(index: number): CreditPack {
 }
 
 function newTipPack(index: number): TipPack {
-  return { id: `tip_${Date.now()}`, label: "New Advisor Tip", amountUsd: 15, revenueCatProductId: "", appleProductId: "", googleProductId: "", isActive: true, sortOrder: index + 1, isDraft: true };
+  return { id: `tip_${Date.now()}`, label: "New Advisor Tip", amountUsd: 15, flutterwavePriceNgn: 0, revenueCatProductId: "", appleProductId: "", googleProductId: "", isActive: true, sortOrder: index + 1, isDraft: true };
 }
 
 function omitDraftFlag<T extends { isDraft?: boolean }>(item: T): Omit<T, "isDraft"> {
@@ -809,6 +813,10 @@ function validate(settings: CreditSettings) {
 
   if (settings.tipPacks?.length) {
     for (const tip of settings.tipPacks) {
+      const ngn = Number(tip.flutterwavePriceNgn ?? 0);
+      if (!Number.isFinite(ngn) || ngn < 0 || !Number.isSafeInteger(Math.round(ngn * 100)) || Math.abs(ngn * 100 - Math.round(ngn * 100)) > 0.00001) {
+        return "Flutterwave tip price must be non-negative NGN with at most two decimal places";
+      }
       if (!tip.id.trim() || !tip.label.trim() || tip.amountUsd <= 0) {
         return "Each tip package needs ID, label, and positive amount USD";
       }
