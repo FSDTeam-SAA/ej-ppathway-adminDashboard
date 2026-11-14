@@ -31,6 +31,7 @@ import { MiniArea } from "../../components/charts";
 import type { SessionItem, TranscriptResponse } from "../../lib/types";
 
 const TABS = [
+  { value: "upcoming", label: "Upcoming Sessions" },
   { value: "live", label: "Live" },
   { value: "completed", label: "Completed" },
   { value: "disputed", label: "Disputed" },
@@ -49,7 +50,7 @@ export default function SessionsPage() {
   const toast = useToast();
   const router = useRouter();
   const [items, setItems] = useState<SessionItem[]>([]);
-  const [tab, setTab] = useState("live");
+  const [tab, setTab] = useState("upcoming");
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
@@ -154,6 +155,16 @@ export default function SessionsPage() {
     setFlagReason(session.flagReason || "");
     setInternalNotes(session.internalNotes || "");
     setTranscript(null);
+    if (["pending", "consent", "waiting"].includes(session.status || "")) {
+      setTranscriptLoading(false);
+      try {
+        const r = await api.get<SessionItem>(`/admin/sessions/${session._id}`);
+        setDetails((current) => current?._id === session._id ? { ...current, ...r.data } : current);
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Could not load booking details");
+      }
+      return;
+    }
     setTranscriptLoading(true);
     try {
       const r = await api.get<TranscriptResponse>(`/admin/sessions/${session._id}/transcript`);
@@ -244,7 +255,7 @@ export default function SessionsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard label="Live Now" value={overview.live ?? 0} icon={<ActivityIcon />} color="#a3e635" />
-          <SummaryCard label="Today Total Sessions" value={total} icon={<VideoIcon />} color="#60a5fa" />
+          <SummaryCard label={tab === "upcoming" ? "Upcoming Bookings" : "Today Total Sessions"} value={total} icon={<VideoIcon />} color="#60a5fa" />
           <SummaryCard label="Flagged" value={overview.flagged ?? 0} icon={<PlayIcon />} color="#fbbf24" />
           <SummaryCard label="Avg. session length" value="--" icon={<ClockIcon />} color="#0ea5e9" />
         </div>
@@ -252,6 +263,13 @@ export default function SessionsPage() {
         <div className="mb-6">
           <Tabs tabs={TABS} active={tab} onChange={(v) => { setTab(v); setPage(1); }} />
         </div>
+
+        {tab === "upcoming" && (
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">Upcoming Sessions</h2>
+            <p className="text-sm text-slate-500">Scheduled bookings across all advisors, earliest first. Booking dates and times are shown in UTC.</p>
+          </div>
+        )}
 
         <BulkActionsBar
           selectedCount={bulk.selectedCount}
@@ -292,9 +310,9 @@ export default function SessionsPage() {
                         onChange={bulk.toggleAll}
                       />
                     </th>
-                    <th className="px-5 py-4 font-medium">Session ID</th>
-                    <th className="px-5 py-4 font-medium">Client</th>
-                    <th className="px-5 py-4 font-medium">Advisor</th>
+                    <th className="px-5 py-4 font-medium">{tab === "upcoming" ? "Booking ID" : "Session ID"}</th>
+                    <th className="px-5 py-4 font-medium">{tab === "upcoming" ? "User / Seeker" : "Client"}</th>
+                    <th className="px-5 py-4 font-medium">{tab === "upcoming" ? "Prophetic Advisor" : "Advisor"}</th>
                     <th className="px-5 py-4 font-medium">
                       <HeaderFilter
                         label="Tier"
@@ -323,7 +341,7 @@ export default function SessionsPage() {
                         options={[
                           { value: "", label: "All Types" },
                           { value: "chat", label: "Chat" },
-                          { value: "call", label: "Call" },
+                          { value: "call", label: "Voice" },
                           { value: "video", label: "Video" },
                         ]}
                         ariaLabel="Filter sessions by communication type"
@@ -331,10 +349,10 @@ export default function SessionsPage() {
                     </th>
                     <th className="px-5 py-4 font-medium">Duration</th>
                     <th className="px-5 py-4 font-medium">Credits</th>
-                    <th className="px-5 py-4 font-medium">Status</th>
+                    <th className="px-5 py-4 font-medium">{tab === "upcoming" ? "Booking Status" : "Status"}</th>
                     <th className="px-5 py-4 font-medium">
                       <HeaderFilter
-                        label="Session Date"
+                        label={tab === "upcoming" ? "Booking Date & Time (UTC)" : "Session Date"}
                         value={periodFilter}
                         onChange={(value) => {
                           setPeriodFilter(value);
@@ -356,7 +374,7 @@ export default function SessionsPage() {
                   {items.length === 0 ? (
                     <tr>
                       <td colSpan={11} className="text-center py-10 text-slate-500">
-                        No sessions
+                        {tab === "upcoming" ? "No upcoming bookings" : "No sessions"}
                       </td>
                     </tr>
                   ) : (
@@ -377,7 +395,9 @@ export default function SessionsPage() {
                           />
                         </td>
                         <td className="px-5 py-3 font-medium text-slate-900">
-                          {s.sessionCode || s._id.slice(-6).toUpperCase()}
+                          <button type="button" onClick={() => openDetails(s)} className="text-[#0a7a90] hover:underline">
+                            {s.sessionCode || s._id.slice(-6).toUpperCase()}
+                          </button>
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
@@ -404,7 +424,7 @@ export default function SessionsPage() {
                           <StatusBadge status={s.status} />
                         </td>
                         <td className="px-5 py-3 text-slate-600">
-                          {formatDate(s.scheduledFor || s.startedAt || s.createdAt, true)}
+                          {tab === "upcoming" ? formatBookingDate(s.scheduledFor) : formatDate(s.scheduledFor || s.startedAt || s.createdAt, true)}
                         </td>
                         <td className="px-5 py-3 text-right">
                           <div className="inline-flex items-center gap-2">
@@ -475,7 +495,7 @@ export default function SessionsPage() {
                   <Field label="Advisor Tier" value={formatTier(details.advisorTier)} />
                   <Field label="Session Type" value={sessionTypeLabel(details.type)} />
                   <Field label="Session Status" value={details.status || "—"} />
-                  <Field label="Session Date & Time" value={formatDate(details.scheduledFor || details.startedAt || details.createdAt, true)} />
+                  <Field label="Booking Date & Time" value={details.scheduledFor ? formatBookingDate(details.scheduledFor) : formatDate(details.startedAt || details.createdAt, true)} />
                   <Field label="Session Start Time" value={details.startedAt ? formatDate(details.startedAt, true) : "—"} />
                   <Field label="Session End Time" value={details.endedAt ? formatDate(details.endedAt, true) : "—"} />
                   <Field label="Session Duration" value={formatDuration(sessionDurationSeconds(details))} />
@@ -781,10 +801,22 @@ function formatCredits(value?: number) {
 }
 
 function sessionDurationSeconds(session: SessionItem) {
+  if (["pending", "consent", "waiting"].includes(session.status || "") && typeof session.durationMinutes === "number") {
+    return session.durationMinutes * 60;
+  }
   if (typeof session.actualDurationSec === "number") return session.actualDurationSec;
   if (typeof session.duration === "number") return session.duration;
   if (typeof session.durationMinutes === "number") return session.durationMinutes * 60;
   return undefined;
+}
+
+function formatBookingDate(value?: string) {
+  if (!value || Number.isNaN(new Date(value).getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value)) + " UTC";
 }
 
 function downloadSessionTranscriptPdf(session: SessionItem, transcript: TranscriptResponse | null) {
@@ -899,7 +931,7 @@ function downloadTextPdf(filename: string, lines: string[]) {
 
 function sessionTypeLabel(type?: string) {
   if (type === "video") return "Video";
-  if (type === "call") return "Call";
+  if (type === "call") return "Voice";
   if (type === "chat") return "Chat";
   return "—";
 }

@@ -286,6 +286,9 @@ export interface SessionItem {
   type?: "chat" | "call" | "video";
   status?:
     | "pending"
+    | "consent"
+    | "waiting"
+    | "expired"
     | "live"
     | "completed"
     | "cancelled"
